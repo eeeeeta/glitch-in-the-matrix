@@ -1,0 +1,12 @@
+[package]
+name = "glitch-in-the-matrix"
+version = "0.1.0"
+authors = ["eeeeeta <eeeeeta@users.noreply.github.com>"]
+
+[dependencies]
+serde = "0.9"
+serde_derive = "0.9"
+serde_json = "0.9"
+hyper = "0.10"
+error-chain = "0.10"
+
