@@ -1,5 +1,12 @@
 [package]
 name = "glitch-in-the-matrix"
+description = "A set of matrix.org bindings for Rust."
+documentation = "http://docs.rs/glitch-in-the-matrix"
+homepage = "https://github.com/eeeeeta/glitch-in-the-matrix"
+repository = "https://github.com/eeeeeta/glitch-in-the-matrix"
+readme = "README.md"
+keywords = ["chat", "matrix"]
+license = "Unlicense"
 version = "0.1.0"
 authors = ["eeeeeta <eeeeeta@users.noreply.github.com>"]
 
