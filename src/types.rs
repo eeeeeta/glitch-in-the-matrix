@@ -98,7 +98,13 @@ pub enum Message {
         geo_uri: String
     }
 }
-
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "presence", rename_all="snake_case")]
+pub enum Presence {
+    Online,
+    Offline,
+    Unavailable
+}
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 /// The content of a room event.
@@ -110,7 +116,7 @@ pub enum Content {
     #[serde(rename="m.typing")]
     Typing { user_ids: Vec<String> },
     #[serde(rename="m.presence")]
-    Presence { presence: String },
+    Presence(Presence),
     Unknown(::serde_json::Value)
 }
 /// An event in a room.
@@ -162,6 +168,11 @@ pub struct SyncReply {
 #[derive(Deserialize, Debug)]
 pub struct SendReply {
     pub event_id: String
+}
+/// The reply obtained from `/join`.
+#[derive(Deserialize, Debug)]
+pub struct JoinReply {
+    pub room_id: String
 }
 /// The reply obtained from `/login`.
 #[derive(Deserialize, Debug)]

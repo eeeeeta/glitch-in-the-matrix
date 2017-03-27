@@ -9,6 +9,7 @@ extern crate serde;
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate serde_json;
 extern crate hyper;
+extern crate hyper_native_tls;
 #[macro_use] extern crate error_chain;
 
 pub mod errors {
@@ -20,6 +21,7 @@ pub mod errors {
             Hyper(::hyper::error::Error);
             Serde(::serde_json::Error);
             Io(::std::io::Error);
+            Ssl(::hyper_native_tls::native_tls::Error);
         }
         errors {
             HttpCode(c: ::hyper::status::StatusCode) {
@@ -39,6 +41,8 @@ use types::*;
 use hyper::method::Method;
 use Method::*;
 use hyper::client::{Response, RequestBuilder};
+use hyper::net::HttpsConnector;
+use hyper_native_tls::NativeTlsClient;
 
 /// A connection to a Matrix homeserver.
 pub struct MatrixClient {
@@ -53,7 +57,9 @@ pub struct MatrixClient {
 impl MatrixClient {
     /// Log in to a Matrix homeserver, and return a client object.
     pub fn login(username: &str, password: &str, url: &str) -> MatrixResult<Self> {
-        let client = hyper::Client::new();
+        let ssl = NativeTlsClient::new()?;
+        let conn = HttpsConnector::new(ssl);
+        let client = hyper::Client::with_connector(conn);
         let mut resp = client.post(&format!("{}/_matrix/client/r0/login", url))
             .body(&json!({
                 "type": "m.login.password",
@@ -83,6 +89,31 @@ impl MatrixClient {
                 bail!(HttpCode(st));
             }
         }
+        Ok(())
+    }
+    /// Join a room by identifier or alias.
+    pub fn join(&mut self, roomid: &str) -> MatrixResult<JoinReply> {
+        let mut resp = self.req(Post, &format!("/join/{}", roomid), vec![])
+            .send()?;
+        Self::handle_errs(&mut resp)?;
+        let rpl = serde_json::from_reader(resp)?;
+        Ok(rpl)
+    }
+    /// Update our presence status.
+    pub fn update_presence(&mut self, p: Presence) -> MatrixResult<()> {
+        let uri = format!("/presence/{}/status", self.user_id);
+        let mut resp = self.req(Put, &uri, vec![])
+            .body(&serde_json::to_string(&p)?)
+            .send()?;
+        Self::handle_errs(&mut resp)?;
+        Ok(())
+    }
+    /// Send a read receipt for a given event ID.
+    pub fn read_receipt(&mut self, roomid: &str, eventid: &str) -> MatrixResult<()> {
+        let uri = format!("/rooms/{}/receipt/m.read/{}", roomid, eventid);
+        let mut resp = self.req(Post, &uri, vec![])
+            .send()?;
+        Self::handle_errs(&mut resp)?;
         Ok(())
     }
     /// Send a message to a room ID.
@@ -149,7 +180,9 @@ impl MatrixClient {
 }
 impl Drop for MatrixClient {
     /// Invalidates our access token, so we don't have millions of devices.
+    /// Also sets us as offline.
     fn drop(&mut self) {
+        let _ = self.update_presence(Presence::Offline);
         let _ = self.req(Post, "/logout", vec![]).send();
     }
 }

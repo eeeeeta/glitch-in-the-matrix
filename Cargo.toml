@@ -7,7 +7,7 @@ repository = "https://github.com/eeeeeta/glitch-in-the-matrix"
 readme = "README.md"
 keywords = ["chat", "matrix"]
 license = "Unlicense"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["eeeeeta <eeeeeta@users.noreply.github.com>"]
 
 [dependencies]
@@ -16,4 +16,4 @@ serde_derive = "0.9"
 serde_json = "0.9"
 hyper = "0.10"
 error-chain = "0.10"
-
+hyper-native-tls = "0.2"
