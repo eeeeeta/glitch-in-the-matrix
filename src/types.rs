@@ -32,7 +32,13 @@ pub enum Message {
     /// This message is the most basic message and is used to represent text.
     Text {
         /// The body of the message.
-        body: String
+        body: String,
+        /// The formatted body of the message (if the message is formatted).
+        #[serde(default)]
+        formatted_body: Option<String>,
+        /// The format of the formatted body (if the message is formatted).
+        #[serde(default)]
+        format: Option<String>
     },
     #[serde(rename="m.notice")]
     /// A m.notice message should be considered similar to a plain m.text message except
@@ -44,7 +50,13 @@ pub enum Message {
     /// exchange messages, as each responds to the other.
     Notice {
         /// The notice text to send.
-        body: String
+        body: String,
+        /// The formatted body of the message (if the message is formatted).
+        #[serde(default)]
+        formatted_body: Option<String>,
+        /// The format of the formatted body (if the message is formatted).
+        #[serde(default)]
+        format: Option<String>
     },
     #[serde(rename="m.image")]
     /// This message represents a single image and an optional thumbnail.
