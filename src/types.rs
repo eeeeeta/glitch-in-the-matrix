@@ -66,11 +66,11 @@ pub enum Message {
         /// e.g. 'image attachment'.
         body: String,
         /// Metadata about the image referred to in url.
-        info: ImageInfo,
+        info: Option<ImageInfo>,
         /// Metadata about the image referred to in thumbnail_url.
-        thumbnail_info: ImageInfo,
+        thumbnail_info: Option<ImageInfo>,
         /// The URL to the thumbnail of the image.
-        thumbnail_url: String,
+        thumbnail_url: Option<String>,
         /// The URL to the image.
         url: String
     },
@@ -92,11 +92,11 @@ pub enum Message {
         /// The original filename of the uploaded file.
         filename: String,
         /// Information about the file referred to in url.
-        info: FileInfo,
+        info: Option<FileInfo>,
         /// Metadata about the image referred to in thumbnail_url.
-        thumbnail_info: ImageInfo,
+        thumbnail_info: Option<ImageInfo>,
         /// The URL to the thumbnail of the file.
-        thumbnail_url: String,
+        thumbnail_url: Option<String>,
         /// The URL to the file.
         url: String
     },
@@ -180,6 +180,11 @@ pub struct SyncReply {
 #[derive(Deserialize, Debug)]
 pub struct SendReply {
     pub event_id: String
+}
+/// The reply obtained from `upload()`.
+#[derive(Deserialize, Debug)]
+pub struct UploadReply {
+    pub content_uri: String
 }
 /// The reply obtained from `/join`.
 #[derive(Deserialize, Debug)]

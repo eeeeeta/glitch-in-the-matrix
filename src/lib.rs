@@ -33,6 +33,10 @@ pub mod errors {
         }
     }
 }
+pub mod http {
+    pub use hyper::method::Method;
+    pub use hyper::header::ContentType;
+}
 pub mod types;
 
 use errors::*;
@@ -41,7 +45,9 @@ use types::*;
 use hyper::method::Method;
 use Method::*;
 use hyper::client::{Response, RequestBuilder};
+use hyper::header::ContentType;
 use hyper::net::HttpsConnector;
+use std::io::Read;
 use hyper_native_tls::NativeTlsClient;
 
 /// A connection to a Matrix homeserver.
@@ -126,6 +132,29 @@ impl MatrixClient {
         let mut resp = self.req(Put, &uri, vec![])
             .body(&body.to_string())
             .send()?;
+        Self::handle_errs(&mut resp)?;
+        let rpl = serde_json::from_reader(resp)?;
+        Ok(rpl)
+    }
+    /// Wrapper function that sends a `Message::Notice` with the specified unformatted text
+    /// to the given room ID. Provided for convenience purposes.
+    pub fn send_simple<T: Into<String>>(&mut self, roomid: &str, msg: T) -> MatrixResult<SendReply> {
+        let msg = Message::Notice { body: msg.into(), formatted_body: None, format: None };
+        self.send(roomid, msg)
+    }
+    /// Wrapper function that sends a `Message::Notice` with the specified HTML-formatted text
+    /// (and accompanying unformatted text, if given) to the given room ID.
+    pub fn send_html<T: Into<String>, U: Into<Option<String>>>(&mut self, roomid: &str, msg: T, unformatted: U) -> MatrixResult<SendReply> {
+        let m = msg.into();
+        let msg = Message::Notice { body: unformatted.into().unwrap_or(m.clone()), formatted_body: Some(m), format: Some("org.matrix.custom.html".into()) };
+        self.send(roomid, msg)
+    }
+    pub fn upload<T: Read>(&mut self, data: &mut T, ct: ContentType) -> MatrixResult<UploadReply> {
+        let req = self.hyper.request(Post, &format!("{}/_matrix/media/r0/upload?access_token={}",
+                                                    self.url, self.access_token))
+            .header(ct)
+            .body(data);
+        let mut resp = req.send()?;
         Self::handle_errs(&mut resp)?;
         let rpl = serde_json::from_reader(resp)?;
         Ok(rpl)
