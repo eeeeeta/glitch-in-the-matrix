@@ -112,6 +112,7 @@ pub enum Message {
 }
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "presence", rename_all="snake_case")]
+/// Information about whether people are online or not.
 pub enum Presence {
     Online,
     Offline,

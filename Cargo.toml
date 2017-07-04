@@ -1,19 +1,21 @@
 [package]
-name = "glitch-in-the-matrix"
+authors = ["eeeeeta <eeeeeta@users.noreply.github.com>"]
 description = "A set of matrix.org bindings for Rust."
 documentation = "http://docs.rs/glitch-in-the-matrix"
 homepage = "https://github.com/eeeeeta/glitch-in-the-matrix"
-repository = "https://github.com/eeeeeta/glitch-in-the-matrix"
-readme = "README.md"
 keywords = ["chat", "matrix"]
-license = "Unlicense"
-version = "0.4.0"
-authors = ["eeeeeta <eeeeeta@users.noreply.github.com>"]
+license = "CC0-1.0"
+name = "glitch-in-the-matrix"
+readme = "README.md"
+repository = "https://github.com/eeeeeta/glitch-in-the-matrix"
+version = "0.5.0"
 
 [dependencies]
+error-chain = "0.10"
+futures = "0.1.14"
+hyper = "0.11"
+hyper-openssl = "0.3"
 serde = "0.9"
 serde_derive = "0.9"
 serde_json = "0.9"
-hyper = "0.10"
-error-chain = "0.10"
-hyper-native-tls = "0.2"
+tokio-core = "0.1"

@@ -8,4 +8,4 @@ Glitch in the Matrix
 It has a number of limitations at present, and is not recommended for production use. Still,
 it is provided in the hope that it might be useful.
 
-Licensed under the [Unlicense](http://unlicense.org/).
+Licensed under CC0.
