@@ -4,6 +4,9 @@
 //! refer to the official API docs for info on what fields mean.
 use std::collections::HashMap;
 
+fn serde_true() -> bool {
+    true
+}
 /// Information about an image.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ImageInfo {
@@ -119,17 +122,52 @@ pub enum Presence {
     Unavailable
 }
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum MembershipState {
+    /// The user has been invited to join a room, but has not yet joined it.
+    /// They may not participate in the room until they join.
+    Invite,
+    /// The user has been invited to join a room, but has not yet joined it.
+    /// They may not participate in the room until they join.
+    Join,
+    /// The user was once joined to the room, but has since left (possibly by
+    /// choice, or possibly by being kicked).
+    Leave,
+    /// The user has been banned from the room, and is no longer allowed to join
+    /// it until they are un-banned from the room (by having their membership
+    /// state set to a value other than this one).
+    Ban,
+    /// This is a reserved word, which currently has no meaning.
+    Knock
+}
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 /// The content of a room event.
 pub enum Content {
     #[serde(rename="m.room.message")]
     RoomMessage(Message),
     #[serde(rename="m.room.member")]
-    RoomMember { membership: String },
+    RoomMember {
+        membership: MembershipState,
+        avatar_url: Option<String>,
+        displayname: Option<String>
+    },
     #[serde(rename="m.typing")]
     Typing { user_ids: Vec<String> },
     #[serde(rename="m.presence")]
     Presence(Presence),
+    #[serde(rename="m.room.aliases")]
+    RoomAliases { aliases: Vec<String> },
+    #[serde(rename="m.room.canonical_alias")]
+    RoomCanonicalAlias { alias: String },
+    #[serde(rename="m.room.create")]
+    RoomCreationEvent {
+        creator: String,
+        #[serde(default = "serde_true", rename = "m.federate")]
+        federated: bool
+    },
+    #[serde(rename="m.room.redaction")]
+    RoomRedaction { reason: Option<String> },
     Unknown(::serde_json::Value)
 }
 /// An event in a room.
@@ -146,7 +184,9 @@ pub struct Event {
     #[serde(default)]
     pub prev_content: Option<Content>,
     #[serde(default)]
-    pub state_key: Option<String>
+    pub state_key: Option<String>,
+    #[serde(default)]
+    pub redacts: Option<String>,
 }
 /// Events in a room.
 #[derive(Serialize, Deserialize, Default, Debug)]
@@ -171,6 +211,71 @@ pub struct SyncRooms {
     #[serde(default)]
     pub leave: HashMap<String, Room>
 }
+#[derive(Serialize, Deserialize, Debug)]
+pub struct StateEvent {
+    pub content: Content,
+    pub state_key: Option<String>,
+    #[serde(rename="type")]
+    pub ty: String
+}
+/// Used for the `preset` parameter of a `NewRoomInfo`.
+#[derive(Serialize, Deserialize, Debug)]
+pub enum RoomPreset {
+    #[serde(rename="private_chat")]
+    /// `join_rules` is set to invite. `history_visibility` is set to shared.
+    PrivateChat,
+    #[serde(rename="trusted_private_chat")]
+    /// `join_rules` is set to invite. `history_visibility` is set to shared.
+    /// All invitees are given the same power level as the room creator.
+    TrustedPrivateChat,
+    #[serde(rename="public_chat")]
+    /// `join_rules` is set to public. `history_visibility` is set to shared.
+    PublicChat
+}
+/// Something that is either `public` or `private`.
+#[derive(Serialize, Deserialize, Debug)]
+pub enum PublicPrivate {
+    #[serde(rename="public")]
+    Public,
+    #[serde(rename="private")]
+    Private
+}
+/// Information pertaining to the creation of a new room.
+#[derive(Serialize, Default, Debug)]
+pub struct NewRoomInfo {
+    /// Extra keys to be added to the content of the m.room.create. The server
+    /// will clobber the following keys: creator. Future versions of the
+    /// specification may allow the server to clobber other keys.
+    pub creation_content: HashMap<String, String>,
+    /// A list of state events to set in the new room. This allows the user to
+    /// override the default state events set in the new room. The expected
+    /// format of the state events are an object with type, state_key and
+    /// content keys set. Takes precedence over events set by presets, but gets
+    /// overridden by name and topic keys.
+    pub initial_state: Vec<StateEvent>,
+    /// A list of user IDs to invite to the room. This will tell the server to
+    /// invite everyone in the list to the newly created room.
+    pub invite: Vec<String>,
+    /// If this is included, an m.room.name event will be sent into the room to
+    /// indicate the name of the room.
+    pub name: Option<String>,
+    /// Convenience parameter for setting various default state events based on a preset.
+    pub preset: Option<RoomPreset>,
+    /// The desired room alias **local part**. If this is included, a room alias
+    /// will be created and mapped to the newly created room. The alias will
+    /// belong on the same homeserver which created the room. For example, if
+    /// this was set to "foo" and sent to the homeserver "example.com" the
+    /// complete room alias would be #foo:example.com.
+    pub room_alias_name: Option<String>,
+    /// If this is included, an m.room.topic event will be sent into the room to
+    /// indicate the topic for the room.
+    pub topic: Option<String>,
+    /// A public visibility indicates that the room will be shown in the
+    /// published room list. A private visibility will hide the room from the
+    /// published room list. Rooms default to private visibility if this key is
+    /// not included.
+    pub visibility: Option<PublicPrivate>
+}
 /// The reply obtained from `sync()`.
 #[derive(Deserialize, Debug)]
 pub struct SyncReply {
@@ -187,9 +292,9 @@ pub struct SendReply {
 pub struct UploadReply {
     pub content_uri: String
 }
-/// The reply obtained from `/join`.
+/// The reply obtained from `create_room()` and `join()`, indicating a room ID.
 #[derive(Deserialize, Debug)]
-pub struct JoinReply {
+pub struct RoomIdReply {
     pub room_id: String
 }
 /// The reply obtained from `/login`.
@@ -200,9 +305,10 @@ pub struct LoginReply {
     pub home_server: String
 }
 /// The reply obtained when something's gone wrong.
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct BadRequestReply {
     pub errcode: String,
+    #[serde(default)]
     pub error: String
 }
 

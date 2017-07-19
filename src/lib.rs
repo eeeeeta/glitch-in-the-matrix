@@ -15,6 +15,7 @@ extern crate hyper_openssl;
 #[macro_use] extern crate error_chain;
 extern crate tokio_core;
 #[macro_use] extern crate futures;
+extern crate url;
 
 pub mod errors {
     //! Error handling, using `error_chain`.
@@ -44,22 +45,24 @@ pub mod http {
     pub use hyper::Method;
     pub use hyper::Body;
     pub use hyper::header::ContentType;
+    pub use hyper::server::{Http, Server};
 }
 pub mod types;
+pub mod appserv;
+mod util;
 
 use errors::*;
-use errors::MatrixErrorKind::*;
 use types::*;
-use hyper::{Method, Body, StatusCode};
+use hyper::{Method, Body};
 use Method::*;
-use hyper::client::{Response, HttpConnector, Request};
+use hyper::client::{HttpConnector, Request};
 use hyper_openssl::HttpsConnector;
 use hyper::header::ContentType;
 use serde::Deserialize;
 use tokio_core::reactor::Handle;
-use futures::*;
 use std::marker::PhantomData;
-use futures::stream::Concat2;
+use futures::*;
+use util::*;
 
 /// A `Future` with a `MatrixError` error type. Returned by most library
 /// functions.
@@ -68,60 +71,6 @@ use futures::stream::Concat2;
 /// for `impl Trait` to arrive to save us from this madness.
 pub type MatrixFuture<T> = Box<Future<Item=T, Error=MatrixError>>;
 
-struct ResponseWrapper<T> {
-    inner: Concat2<Body>,
-    sc: StatusCode,
-    _ph: PhantomData<T>,
-}
-struct UnitaryResponseWrapper {
-    inner: ResponseWrapper<()>
-}
-impl<T: Deserialize> ResponseWrapper<T> {
-    fn wrap(r: Response) -> Self {
-        let sc = r.status();
-        let inner = r.body().concat2();
-        let _ph = PhantomData;
-        Self { sc, inner, _ph, }
-    }
-    fn _poll(&mut self) -> Poll<hyper::Chunk, MatrixError> {
-        let resp = try_ready!(self.inner.poll());
-        if !self.sc.is_success() {
-            if let Ok(e) = serde_json::from_slice::<BadRequestReply>(&resp) {
-                bail!(BadRequest(e));
-            }
-            else {
-                bail!(HttpCode(self.sc.clone()));
-            }
-        }
-        Ok(Async::Ready(resp))
-    }
-}
-impl UnitaryResponseWrapper {
-    fn wrap(r: Response) -> Self {
-        Self {
-            inner: ResponseWrapper::<()>::wrap(r)
-        }
-    }
-}
-impl<T: Deserialize> Future for ResponseWrapper<T> {
-    type Item = T;
-    type Error = MatrixError;
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let resp = try_ready!(self._poll());
-        let data = serde_json::from_slice::<T>(&resp)?;
-        Ok(Async::Ready(data))
-    }
-}
-impl Future for UnitaryResponseWrapper {
-    type Item = ();
-    type Error = MatrixError;
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        try_ready!(self.inner._poll());
-        Ok(Async::Ready(()))
-    }
-}
 /// A `Stream` that yields constant replies to `/sync`.
 ///
 /// This calls the long-polling `/sync` API, which will wait until replies come
@@ -207,17 +156,20 @@ impl Stream for SyncStream {
         }
     }
 }
-
+pub struct Appserv;
+pub struct Normal;
 /// A connection to a Matrix homeserver.
-pub struct MatrixClient {
+pub struct MatrixClient<T> {
     hyper: hyper::Client<HttpsConnector<HttpConnector>>,
     access_token: String,
     hdl: Handle,
     user_id: String,
     url: String,
-    txnid: u32
+    txnid: u32,
+    appserv: bool,
+    _ph: PhantomData<T>
 }
-impl MatrixClient {
+impl MatrixClient<Normal> {
     /// Log in to a Matrix homeserver, and return a client object.
     pub fn login(username: &str, password: &str, url: &str, hdl: &Handle) -> MatrixFuture<Self> {
         let conn = match HttpsConnector::new(4, hdl) {
@@ -247,12 +199,62 @@ impl MatrixClient {
                 user_id: rpl.user_id,
                 url: url,
                 hdl: hdl,
-                txnid: 0
+                txnid: 0,
+                appserv: false,
+                _ph: PhantomData
             }
         }))
     }
+}
+impl MatrixClient<Appserv> {
+    /// Create a new `MatrixClient` from an appservice token and user ID to act as.
+    pub fn new_as_appservice(user_id: &str, as_token: &str, url: &str, hdl: &Handle) -> MatrixResult<Self> {
+        let conn = HttpsConnector::new(4, hdl)?;
+        let client = hyper::Client::configure()
+            .connector(conn)
+            .build(hdl);
+        Ok(MatrixClient {
+            hyper: client,
+            access_token: as_token.into(),
+            user_id: user_id.into(),
+            url: url.into(),
+            hdl: hdl.clone(),
+            txnid: 0,
+            appserv: true,
+            _ph: PhantomData
+        })
+    }
+    /// Registers a new user under the AS namespace with a given user ID.
+    ///
+    /// **NOTE:** This does NOT set the user ID of this `MatrixClient`; you need
+    /// to do this after determining the registration was successful.
+    pub fn register_new_user(&mut self, user_id: &str) -> MatrixFuture<()> {
+        let uri: hyper::Uri = match format!("{}/_matrix/client/r0/register", self.url).parse() {
+            Ok(u) => u,
+            Err(e) => return Box::new(futures::future::err(e.into()))
+        };
+        let mut req = Request::new(Post, uri);
+        req.set_body(json!({
+            "type": "m.login.application_service",
+            "username": user_id.to_string(),
+        }).to_string());
+        Box::new(self.hyper.request(req).map_err(|e| e.into()).and_then(UnitaryResponseWrapper::wrap))
+    }
+    /// Sets the user ID of this `MatrixClient`. Intended to be used for ASes.
+    pub fn set_user_id(&mut self, user_id: &str) {
+        self.user_id = user_id.into();
+    }
+    /// Send a message to a room, massaging the timestamp to a given value.
+    ///
+    /// This sends the message as normal, but adjusts the `origin_server_ts` of
+    /// the resultant event.
+    pub fn send_with_massaging(&mut self, roomid: &str, msg: Message, ts: u32) -> MatrixFuture<SendReply> {
+        self._send_message(roomid, msg, Some(ts))
+    }
+}
+impl<V> MatrixClient<V> {
     /// Join a room by identifier or alias.
-    pub fn join(&mut self, roomid: &str) -> MatrixFuture<JoinReply> {
+    pub fn join(&mut self, roomid: &str) -> MatrixFuture<RoomIdReply> {
         self.req(Post, &format!("/join/{}", roomid), vec![], None)
     }
     /// Update our presence status.
@@ -269,8 +271,7 @@ impl MatrixClient {
         let uri = format!("/rooms/{}/receipt/m.read/{}", roomid, eventid);
         self.discarding_req(Post, &uri, vec![], None)
     }
-    /// Send a message to a room ID.
-    pub fn send(&mut self, roomid: &str, msg: Message) -> MatrixFuture<SendReply> {
+    fn _send_message(&mut self, roomid: &str, msg: Message, ts: Option<u32>) -> MatrixFuture<SendReply> {
         let body = match serde_json::to_string(&msg) {
             Ok(x) => x,
             Err(e) => return Box::new(futures::future::err(e.into()))
@@ -279,20 +280,35 @@ impl MatrixClient {
                           roomid,
                           self.txnid);
         self.txnid += 1;
-        self.req(Put, &uri, vec![], Some(body.into()))
+        let params = match ts {
+            Some(ts) => vec![format!("ts={}", ts)],
+            None => vec![]
+        };
+        self.req(Put, &uri, params, Some(body.into()))
+    }
+    /// Send a message to a room ID.
+    pub fn send_message(&mut self, roomid: &str, msg: Message) -> MatrixFuture<SendReply> {
+        self._send_message(roomid, msg, None)
     }
     /// Wrapper function that sends a `Message::Notice` with the specified unformatted text
     /// to the given room ID. Provided for convenience purposes.
     pub fn send_simple<T: Into<String>>(&mut self, roomid: &str, msg: T) -> MatrixFuture<SendReply> {
         let msg = Message::Notice { body: msg.into(), formatted_body: None, format: None };
-        self.send(roomid, msg)
+        self.send_message(roomid, msg)
     }
     /// Wrapper function that sends a `Message::Notice` with the specified HTML-formatted text
     /// (and accompanying unformatted text, if given) to the given room ID.
     pub fn send_html<T: Into<String>, U: Into<Option<String>>>(&mut self, roomid: &str, msg: T, unformatted: U) -> MatrixFuture<SendReply> {
         let m = msg.into();
         let msg = Message::Notice { body: unformatted.into().unwrap_or(m.clone()), formatted_body: Some(m), format: Some("org.matrix.custom.html".into()) };
-        self.send(roomid, msg)
+        self.send_message(roomid, msg)
+    }
+    pub fn create_room(&mut self, info: NewRoomInfo) -> MatrixFuture<RoomIdReply> {
+        let body = match serde_json::to_string(&info) {
+            Ok(x) => x,
+            Err(e) => return Box::new(futures::future::err(e.into()))
+        };
+        self.req(Post, "/createRoom", vec![], Some(body.into()))
     }
     /// Upload some data (convertible to a `Body`) of a given `ContentType`, like an image.
     ///
@@ -304,8 +320,8 @@ impl MatrixClient {
     /// `ContentType` is accessible via the `http` module. See the documentation
     /// there for more information on how to use it.
     pub fn upload<T: Into<Body>>(&mut self, data: T, ct: ContentType) -> MatrixFuture<UploadReply> {
-        let req = self.get_request_for(Post, &format!("{}/_matrix/media/r0/upload?access_token={}",
-                                                          self.url, self.access_token), vec![], Some(data.into()));
+        let req = self.get_request_for(Post, &format!("{}/_matrix/media/r0/upload",
+                                                      self.url), vec![], Some(data.into()));
         let mut req = match req {
             Ok(r) => r,
             Err(e) => return Box::new(futures::future::err(e.into()))
@@ -361,7 +377,10 @@ impl MatrixClient {
     /// # Errors
     ///
     /// Errors if your `endpoint` and `params` result in an invalid `Uri`.
-    pub fn get_request_for(&self, meth: Method, endpoint: &str, params: Vec<String>, body: Option<Body>) -> MatrixResult<Request> {
+    pub fn get_request_for(&self, meth: Method, endpoint: &str, mut params: Vec<String>, body: Option<Body>) -> MatrixResult<Request> {
+        if self.appserv {
+            params.push(format!("user_id={}", self.user_id));
+        }
         let mut req = Request::new(meth, format!("{}/_matrix/client/r0{}?access_token={}{}{}",
                                              self.url,
                                              endpoint,
@@ -389,7 +408,7 @@ impl MatrixClient {
                  .and_then(UnitaryResponseWrapper::wrap))
     }
 }
-impl Drop for MatrixClient {
+impl<V> Drop for MatrixClient<V> {
     /// Invalidates our access token, so we don't have millions of devices.
     /// Also sets us as offline.
     fn drop(&mut self) {
