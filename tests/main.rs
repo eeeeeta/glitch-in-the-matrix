@@ -1,7 +1,7 @@
 extern crate glitch_in_the_matrix as matrix_api;
 extern crate serde_json;
 
-use matrix_api::types::Event;
+use matrix_api::types::{Event,BasicEvent};
 use std::fs;
 use std::io;
 
@@ -14,7 +14,10 @@ fn read_file(file: &str) -> String {
 
 }
 
-
+enum Events {
+    BasicEvent(BasicEvent),
+    Event(Event),
+}
 #[test]
 fn deser_events() {
     let paths = fs::read_dir("tests/event-examples").unwrap();
@@ -26,9 +29,21 @@ fn deser_events() {
         let path = path.to_str().unwrap();
         let text = read_file(&path);
         println!("{}:", filename);
-        if let Err(error) = ::serde_json::from_str::<Event>(&text) {
-            println!("Error {}",error);
-        }
+        let parts = filename.split(".").collect::<Vec<&str>>().len();
+        if parts == 2 {
+            match ::serde_json::from_str::<BasicEvent>(&text) {
+                Ok(res) => {
+                    println!("{:?}",res);
+                },
+                Err(error) => {
+                    println!("Error {}",error);
+                }
+            }
+        } else {
+            if let Err(error) = ::serde_json::from_str::<Event>(&text) {
+                println!("Error {}",error);
+            }
+        };
 
     }
 }
