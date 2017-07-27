@@ -110,6 +110,7 @@ pub enum Message {
         geo_uri: String
     }
 }
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "presence", rename_all="snake_case")]
 /// Information about whether people are online or not.
@@ -118,36 +119,106 @@ pub enum Presence {
     Offline,
     Unavailable
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(tag="join_rule", rename_all="snake_case")]
+/// Defines who can join a room
+pub enum JoinRule {
+    Public,
+    Invite,
+    // reserved keywords
+    // Knock,
+    // Private,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(tag="membership", rename_all="snake_case")]
+/// Defines what Membership a user in a room
+pub enum Membership {
+    Invite,
+    Join,
+    Leave,
+    Ban,
+    // reserved word
+    // Knock,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 /// The content of a room event.
 pub enum Content {
+    #[serde(rename="m.room.aliases")]
+    RoomAliases { aliases: Vec<String> },
+    #[serde(rename="m.room.canonical_alias")]
+    RoomCanonicalAlias { alias: String },
+    #[serde(rename="m.room.create")]
+    RoomCreate { creator: String },
+    #[serde(rename="m.room.join_rules")]
+    RoomJoinRule(JoinRule),
+    #[serde(rename="m.room.member")]
+    RoomMember {
+        avatar_url: Option<String>,
+        displayname: Option<String>,
+        membership: Membership,
+        is_direct: 	Option<bool>,
+        third_party_invite: Option<::serde_json::Value>,
+    },
+    // #[serde(rename="m.room.")]
+    // Member { },
+    // #[serde(rename="m.room.")]
+    // Member { },
+    // #[serde(rename="m.room.")]
+    // Member { },
     #[serde(rename="m.room.message")]
     RoomMessage(Message),
-    #[serde(rename="m.room.member")]
-    RoomMember { membership: String },
     #[serde(rename="m.typing")]
     Typing { user_ids: Vec<String> },
     #[serde(rename="m.presence")]
     Presence(Presence),
-    Unknown(::serde_json::Value)
+    // in debug mode, every event must be known
+    #[cfg(not(debug_assertions))]
+    Unknown(::serde_json::Value),
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+// in debug mode, every field must be parsed
+#[cfg_attr(debug_assertions, serde(deny_unknown_fields))]
+/// Event in invite_room_state
+pub struct InviteStateEvent {
+    #[serde(rename="type")]
+    pub event_type: String,
+    pub content: Content,
+    pub sender: Option<String>,
+    #[serde(default)]
+    pub state_key: Option<String>,
+}
+
 /// An event in a room.
 #[derive(Serialize, Deserialize, Debug)]
+// in debug mode, every field must be parsed
 #[cfg_attr(debug_assertions, serde(deny_unknown_fields))]
 pub struct Event {
     pub event_id: String,
     pub sender: String,
+    pub content: Content,
     #[serde(rename="type")]
-    pub ty: String,
+    pub event_type: String,
+    pub room_id: Option<String>,
+    #[serde(default)]
     pub origin_server_ts: u64,
     #[serde(default)]
+    pub state_key: Option<String>,
+    #[serde(default)]
     pub age: Option<u64>,
-    pub content: Content,
     #[serde(default)]
     pub prev_content: Option<Content>,
+    #[serde(default,rename="txn_id")]
+    pub transaction_id: Option<String>,
     #[serde(default)]
-    pub state_key: Option<String>
+    pub invite_room_state: Vec<InviteStateEvent>,
+    // recursive ._.
+    // /// optional. The event that redacted this event, if any.
+    // redacted_because: Option<Event>,
 }
 /// Events in a room.
 #[derive(Serialize, Deserialize, Default, Debug)]
@@ -215,9 +286,13 @@ fn test_deser_events() {
     for event in event_json["events"].members() {
         let e_json = ::json::stringify_pretty(event.clone(),4);
         println!("trying to parse event of type {}:",event["type"]);
+        // println!("{:#}",e_json);
+        // let e = ::serde_json::from_str::<Event>(&e_json[..]).unwrap();
+        // if event.has_key("invite_room_state") {
+        //     println!("{:?}", e.invite_room_state);
+        // }
     }
 }
-
 
 #[cfg(test)]
 #[test]
