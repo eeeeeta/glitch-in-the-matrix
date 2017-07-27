@@ -134,6 +134,7 @@ pub enum Content {
 }
 /// An event in a room.
 #[derive(Serialize, Deserialize, Debug)]
+#[cfg_attr(debug_assertions, serde(deny_unknown_fields))]
 pub struct Event {
     pub event_id: String,
     pub sender: String,
@@ -205,6 +206,18 @@ pub struct BadRequestReply {
     pub errcode: String,
     pub error: String
 }
+
+#[cfg(test)]
+#[test]
+fn test_deser_events() {
+    let event_list: &str = include_str!("../events.json");
+    let event_json = ::json::parse(event_list).unwrap();
+    for event in event_json["events"].members() {
+        let e_json = ::json::stringify_pretty(event.clone(),4);
+        println!("trying to parse event of type {}:",event["type"]);
+    }
+}
+
 
 #[cfg(test)]
 #[test]
