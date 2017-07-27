@@ -121,7 +121,7 @@ pub enum Presence {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(tag="join_rule", rename_all="snake_case")]
+#[serde(tag="join_rules", rename_all="snake_case")]
 /// Defines who can join a room
 pub enum JoinRule {
     Public,
@@ -132,7 +132,7 @@ pub enum JoinRule {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(tag="membership", rename_all="snake_case")]
+#[serde(rename_all="snake_case")]
 /// Defines what Membership a user in a room
 pub enum Membership {
     Invite,
@@ -163,12 +163,24 @@ pub enum Content {
         is_direct: 	Option<bool>,
         third_party_invite: Option<::serde_json::Value>,
     },
+    #[serde(rename="m.room.power_levels")]
+    RoomPowerLevels {
+        ban: u32,
+        events: HashMap<String,u32>,
+        events_default: u32,
+        invite: u32,
+        kick: u32,
+        redact: u32,
+        state_default: u32,
+        users: HashMap<String,u32>,
+        users_default: u32,
+    },
+    #[serde(rename="m.room.redaction")]
+    RoomRedaction { readon: String, },
     // #[serde(rename="m.room.")]
-    // Member { },
-    // #[serde(rename="m.room.")]
-    // Member { },
-    // #[serde(rename="m.room.")]
-    // Member { },
+    // Room { },
+    #[serde(rename="m.room.name")]
+    RoomName { name: String, },
     #[serde(rename="m.room.message")]
     RoomMessage(Message),
     #[serde(rename="m.typing")]
@@ -280,14 +292,16 @@ pub struct BadRequestReply {
 
 #[cfg(test)]
 #[test]
-fn test_deser_events() {
+fn test_deser() {
     let event_list: &str = include_str!("../events.json");
     let event_json = ::json::parse(event_list).unwrap();
     for event in event_json["events"].members() {
         let e_json = ::json::stringify_pretty(event.clone(),4);
         println!("trying to parse event of type {}:",event["type"]);
-        // println!("{:#}",e_json);
-        // let e = ::serde_json::from_str::<Event>(&e_json[..]).unwrap();
+        if let Err(error) = ::serde_json::from_str::<Event>(&e_json[..]) {
+            println!("Error parsing json: {}",error);
+            println!("{:#}",e_json);
+        }
         // if event.has_key("invite_room_state") {
         //     println!("{:?}", e.invite_room_state);
         // }
