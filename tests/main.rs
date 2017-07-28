@@ -1,7 +1,7 @@
 extern crate glitch_in_the_matrix as matrix_api;
 extern crate serde_json;
 
-use matrix_api::types::{SyncReply,EventTypes,RedactsEvent};
+use matrix_api::types::{SyncReply,EventTypes};
 use std::fs;
 use std::io;
 
@@ -23,20 +23,31 @@ fn deser_events() {
         let path = path.unwrap();
         let filename = path.file_name();
         let filename = filename.to_str().unwrap();
-        let parts = filename.split(".").collect::<Vec<&str>>().len();
-        if parts != 2 {
-            let path = path.path();
-            let path = path.to_str().unwrap();
-            let text = read_file(&path);
-            println!("test deser_events: parsing {}", filename);
-            match ::serde_json::from_str::<EventTypes>(&text) {
-                Ok(res) => {
-                    // println!("{:?}",res);
-                },
-                Err(error) => {
-                    failed = true;
-                    println!("test deser_events: Error {}",error);
+        let path = path.path();
+        let path = path.to_str().unwrap();
+        let text = read_file(&path);
+        let parsed = ::serde_json::from_str::<EventTypes>(&text);
+        print!("test deser_events: parsing {:32} which is ", filename);
+        match parsed {
+            Ok(res) => {
+                match res {
+                    EventTypes::EphemeralEvent(_) => {
+                        println!("EphemeralEvent");
+                    },
+                    EventTypes::InviteStateEvent(_) => {
+                        println!("InviteStateEvent");
+                    }
+                    EventTypes::RedactedEvent(_) => {
+                        println!("RedactEvent");
+                    }
+                    EventTypes::Event(_) => {
+                        println!("Event");
+                    }
                 }
+            },
+            Err(error) => {
+                failed = true;
+                println!("Error {}",error);
             }
         }
     }
@@ -50,8 +61,10 @@ fn deser_events() {
 
 #[test]
 fn deser_sync() {
-    let sync_json = read_file("tests/sync.json");
-    println!("test deser_sync: trying to parse sync");
-    ::serde_json::from_str::<SyncReply>(&sync_json);
-    println!("test deser_sync: sucessfully parsed sync!");
+    for v in ["unstable","r0"] {
+        let sync_json = read_file(format!("tests/{}_sync.json",v));
+        println!("test deser_sync: trying to parse sync {}",v);
+        ::serde_json::from_str::<SyncReply>(&sync_json).unwrap();
+        println!("test deser_sync: sucessfully parsed sync {}!",v);
+    }
 }

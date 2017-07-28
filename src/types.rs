@@ -230,12 +230,16 @@ pub enum Content {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct UnsignedRedacts {
+pub struct UnsignedData {
     age: u64,
+    prev_content: Option<Content>,
+    txn_id: Option<String>,
+    redacted_because: Option<::serde_json::Value>,
 }
 
-
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+/// Events like m.typing
 pub struct EphemeralEvent {
     #[serde(rename="type")]
     pub event_type: String,
@@ -245,6 +249,7 @@ pub struct EphemeralEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
 /// Event in invite_room_state
 pub struct InviteStateEvent {
     #[serde(rename="type")]
@@ -252,27 +257,24 @@ pub struct InviteStateEvent {
     pub content: Content,
     pub sender: Option<String>,
     pub state_key: Option<String>,
-    pub redacted_because: Option<Event>,
 }
-/// A redact event
 #[derive(Serialize, Deserialize, Debug)]
-pub struct RedactsEvent {
+#[serde(deny_unknown_fields)]
+/// A redact event
+pub struct RedactedEvent {
     // event
     #[serde(rename="type")]
     pub event_type: String,
     pub content: Content,
-    // room event
-    pub event_id: String,
-    pub room_id: String,
-    pub sender: String,
-    pub origin_server_ts: u64,
-    // can be recursive until we differ between redacted and not redacted events
-    pub unsigned: UnsignedRedacts,
-    // state event
-    pub redacts: String,
+    pub prev_content: Option<Content>,
+    pub event_id: Option<String>,
+    pub room_id: Option<String>,
+    pub sender: Option<String>,
+    pub redacted_because: Event
 }
 /// An event in a room.
 #[derive(Serialize, Deserialize, Debug)]
+#[cfg_attr(debug_assertions, serde(deny_unknown_fields))]
 pub struct Event {
     // event
     #[serde(rename="type")]
@@ -280,27 +282,29 @@ pub struct Event {
     pub content: Content,
     // room event
     pub event_id: String,
-    pub room_id: String,
+    pub room_id: Option<String>,
     pub sender: String,
     pub origin_server_ts: u64,
     // can be recursive until we differ between redacted and not redacted events
-    pub unsigned: Option<::serde_json::Value>,
-    pub age: u64,
+    pub unsigned: Option<UnsignedData>,
     // state event
     pub state_key: Option<String>,
     pub prev_content: Option<Content>,
     pub invite_room_state: Option<Vec<InviteStateEvent>>,
+    // extra
+    pub age: Option<u64>,
+    pub txn_id: Option<String>,
+    pub redacts: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-#[cfg_attr(debug_assertions, serde(deny_unknown_fields))]
 #[serde(untagged)]
 /// the different event types
 pub enum EventTypes {
     EphemeralEvent(EphemeralEvent),
     InviteStateEvent(InviteStateEvent),
     Event(Event),
-    RedactsEvent(RedactsEvent),
+    RedactedEvent(RedactedEvent),
 }
 
 
@@ -308,7 +312,7 @@ pub enum EventTypes {
 /// Events in a room.
 #[derive(Serialize, Deserialize, Default, Debug)]
 pub struct Events {
-    pub events: Vec<Events>
+    pub events: Vec<EventTypes>
 }
 /// Information about a room's events.
 #[derive(Serialize, Deserialize, Debug)]
@@ -362,25 +366,6 @@ pub struct BadRequestReply {
     pub errcode: String,
     pub error: String
 }
-// 
-// #[cfg(test)]
-// #[test]
-// fn test_deser() {
-//     // let event_list: &str = include_str!("../events.json");
-//     let event_list: &str = "";
-//     let event_json = ::json::parse(event_list).unwrap();
-//     for event in event_json["events"].members() {
-//         let e_json = ::json::stringify_pretty(event.clone(),4);
-//         println!("trying to parse event of type {}:",event["type"]);
-//         if let Err(error) = ::serde_json::from_str::<Event>(&e_json[..]) {
-//             println!("Error parsing json: {}",error);
-//             println!("{:#}",e_json);
-//         }
-//         // if event.has_key("invite_room_state") {
-//         //     println!("{:?}", e.invite_room_state);
-//         // }
-//     }
-// }
 
 // #[cfg(test)]
 // #[test]
