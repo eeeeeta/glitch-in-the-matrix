@@ -231,10 +231,11 @@ pub enum Content {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UnsignedData {
-    age: u64,
-    prev_content: Option<Content>,
-    txn_id: Option<String>,
-    redacted_because: Option<::serde_json::Value>,
+    pub age: u64,
+    pub prev_content: Option<Content>,
+    pub prev_sender: Option<String>,
+    pub txn_id: Option<String>,
+    pub redacted_because: Option<::serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -266,6 +267,7 @@ pub struct RedactedEvent {
     #[serde(rename="type")]
     pub event_type: String,
     pub content: Content,
+    pub prev_sender: Option<String>,
     pub prev_content: Option<Content>,
     pub event_id: Option<String>,
     pub room_id: Option<String>,
@@ -295,6 +297,7 @@ pub struct Event {
     pub age: Option<u64>,
     pub txn_id: Option<String>,
     pub redacts: Option<String>,
+    pub membership: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

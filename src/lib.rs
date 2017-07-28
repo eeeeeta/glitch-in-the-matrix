@@ -16,8 +16,6 @@ extern crate hyper_openssl;
 extern crate tokio_core;
 #[macro_use] extern crate futures;
 
-#[cfg(test)] extern crate json;
-
 pub mod errors {
     //! Error handling, using `error_chain`.
     error_chain! {
