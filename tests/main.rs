@@ -61,8 +61,8 @@ fn deser_events() {
 
 #[test]
 fn deser_sync() {
-    for v in ["unstable","r0"] {
-        let sync_json = read_file(format!("tests/{}_sync.json",v));
+    for v in ["unstable","r0"].iter() {
+        let sync_json = read_file(&format!("tests/sync_{}.json",v));
         println!("test deser_sync: trying to parse sync {}",v);
         ::serde_json::from_str::<SyncReply>(&sync_json).unwrap();
         println!("test deser_sync: sucessfully parsed sync {}!",v);
