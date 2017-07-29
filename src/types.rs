@@ -131,7 +131,7 @@ pub enum Message {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(tag = "presence", rename_all="snake_case")]
+#[serde(rename_all="snake_case")]
 /// Information about whether people are online or not.
 pub enum Presence {
     Online,
@@ -140,7 +140,7 @@ pub enum Presence {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(tag="join_rules", rename_all="snake_case")]
+#[serde(rename_all="snake_case")]
 /// Defines who can join a room
 pub enum JoinRule {
     Public,
@@ -171,6 +171,28 @@ pub enum FeedbackType {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all="snake_case")]
+/// Defines what Membership a user in a room
+pub enum HistoryVisibility {
+    Invited,
+    Joined,
+    Shared,
+    WorldReadable,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Receipts {
+    #[serde(rename="m.read")]
+    read: HashMap<String,Receipt>
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Receipt {
+    ts: u64,
+}
+
+
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 /// The content of a room event.
 pub enum Content {
@@ -181,7 +203,7 @@ pub enum Content {
     #[serde(rename="m.room.create")]
     RoomCreate { creator: String },
     #[serde(rename="m.room.join_rules")]
-    RoomJoinRule(JoinRule),
+    RoomJoinRule{ join_rule: JoinRule },
     #[serde(rename="m.room.member")]
     RoomMember {
         avatar_url: Option<String>,
@@ -216,16 +238,34 @@ pub enum Content {
     RoomName { name: String, },
     #[serde(rename="m.room.topic")]
     RoomTopic { topic: String, },
-    #[serde(rename="m.room.")]
-    Room { },
-    // #[serde(rename="m.room.")]
-    // Room { },
     #[serde(rename="m.typing")]
     Typing { user_ids: Vec<String> },
+    #[serde(rename="m.receipt")]
+    Receipt( HashMap<String,Receipts>),
     #[serde(rename="m.presence")]
-    Presence(Presence),
-    // in debug mode, every event must be known
-    #[cfg(not(debug_assertions))]
+    Presence {
+        avatar_url: Option<String>,
+        displayname: Option<String>,
+        last_active_ago: Option<i32>,
+        presence: Presence,
+        currently_active: bool,
+        user_id: String,
+    },
+    #[serde(rename="m.history_visibility")]
+    HistoryVisibility { history_visibility:HistoryVisibility },
+    // #[serde(rename="m.")]
+    //  { },
+    // #[serde(rename="m.")]
+    //  { },
+    // #[serde(rename="m.")]
+    //  { },
+    // #[serde(rename="m.")]
+    //  { },
+    // #[serde(rename="m.room.")]
+    // Room { },
+    // #[serde(rename="m.presence")]
+    // Presence(Presence),
+    #[cfg(not(feature="gitm_deny_unknown_event_content"))]
     Unknown(::serde_json::Value),
 }
 
@@ -276,7 +316,8 @@ pub struct RedactedEvent {
 }
 /// An event in a room.
 #[derive(Serialize, Deserialize, Debug)]
-#[cfg_attr(debug_assertions, serde(deny_unknown_fields))]
+#[serde(deny_unknown_fields)]
+// #[cfg_attr(features="must_match_fields",
 pub struct Event {
     // event
     #[serde(rename="type")]
@@ -303,6 +344,8 @@ pub struct Event {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
+// #[serde(deny_unknown_fields)]
+/// for now events have to exactly follow the specs
 /// the different event types
 pub enum EventTypes {
     EphemeralEvent(EphemeralEvent),
