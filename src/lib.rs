@@ -109,6 +109,8 @@ impl<T: Deserialize> Future for ResponseWrapper<T> {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         let resp = try_ready!(self._poll());
+        #[cfg(feature="gitm_show_responses")]
+        println!("{:#}",String::from_utf8(resp.to_vec()).unwrap());
         let data = serde_json::from_slice::<T>(&resp)?;
         Ok(Async::Ready(data))
     }
