@@ -292,6 +292,7 @@ pub struct Event {
     // state event
     pub state_key: Option<String>,
     pub prev_content: Option<Content>,
+    pub prev_sender: Option<String>,
     pub invite_room_state: Option<Vec<InviteStateEvent>>,
     // extra
     pub age: Option<u64>,
