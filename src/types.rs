@@ -24,14 +24,15 @@ pub struct Image {
     /// the filename of the image, or some kind of content description for accessibility
     /// e.g. 'image attachment'.
     pub body: String,
+    pub msgtype: String,
+    /// The URL to the image.
+    pub url: String,
     /// Metadata about the image referred to in url.
     pub info: Option<ImageInfo>,
-    /// Metadata about the image referred to in thumbnail_url.
-    pub thumbnail_info: Option<ImageInfo>,
     /// The URL to the thumbnail of the image.
     pub thumbnail_url: Option<String>,
-    /// The URL to the image.
-    pub url: String
+    /// Metadata about the image referred to in thumbnail_url.
+    pub thumbnail_info: Option<ImageInfo>,
 }
 
 /// Information about a file.
@@ -43,7 +44,7 @@ pub struct FileInfo {
     pub size: u32
 }
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(tag = "msgtype")]
+#[serde(untagged)]
 /// A message sent to a room.
 pub enum Message {
     #[serde(rename="m.text")]
@@ -179,6 +180,13 @@ pub enum HistoryVisibility {
     Shared,
     WorldReadable,
 }
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all="snake_case")]
+/// Wether guests can join this room
+pub enum GuestAccess {
+    CanJoin,
+    Forbidden,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Receipts {
@@ -191,9 +199,23 @@ pub struct Receipt {
     ts: u64,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PublicKey {
+    public_key: String,
+    key_validity_url: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RoomTag {
+    // can be a number or a string
+    order: Option<::serde_json::Value>,
+}
+
+
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
+#[serde(deny_unknown_fields)]
 /// The content of a room event.
 pub enum Content {
     #[serde(rename="m.room.aliases")]
@@ -203,7 +225,10 @@ pub enum Content {
     #[serde(rename="m.room.create")]
     RoomCreate { creator: String },
     #[serde(rename="m.room.join_rules")]
-    RoomJoinRule{ join_rule: JoinRule },
+    RoomJoinRule{
+        #[serde(rename="join_rules")]
+        join_rule: JoinRule
+    },
     #[serde(rename="m.room.member")]
     RoomMember {
         avatar_url: Option<String>,
@@ -225,7 +250,7 @@ pub enum Content {
         users_default: u32,
     },
     #[serde(rename="m.room.redaction")]
-    RoomRedaction { readon: String, },
+    RoomRedaction { reason: Option<String>, },
     #[serde(rename="m.room.message")]
     RoomMessage(Message),
     #[serde(rename="m.room.message.feedback")]
@@ -236,6 +261,13 @@ pub enum Content {
     },
     #[serde(rename="m.room.name")]
     RoomName { name: String, },
+    #[serde(rename="m.room.avatar")]
+    RoomAvatar {
+        info: ImageInfo,
+        url: String,
+        thumbnail_url: Option<String>,
+        thumbnail_info: Option<ImageInfo>,
+    },
     #[serde(rename="m.room.topic")]
     RoomTopic { topic: String, },
     #[serde(rename="m.typing")]
@@ -253,10 +285,17 @@ pub enum Content {
     },
     #[serde(rename="m.history_visibility")]
     HistoryVisibility { history_visibility:HistoryVisibility },
-    // #[serde(rename="m.")]
-    //  { },
-    // #[serde(rename="m.")]
-    //  { },
+    #[serde(rename="m.room.guest_access")]
+    RoomGuestAccess { guest_access: GuestAccess },
+    #[serde(rename="m.room.third_party_invite")]
+    ThirdPartyInvite {
+        key_validity_url: String,
+        public_key: String,
+        display_name: String,
+        public_keys: Vec<PublicKey>,
+    },
+    #[serde(rename="m.tag")]
+    Tag { tags: HashMap<String,RoomTag> },
     // #[serde(rename="m.")]
     //  { },
     // #[serde(rename="m.")]
@@ -325,9 +364,9 @@ pub struct Event {
     pub content: Content,
     // room event
     pub event_id: String,
-    pub room_id: Option<String>,
     pub sender: String,
     pub origin_server_ts: u64,
+    pub room_id: Option<String>,
     // can be recursive until we differ between redacted and not redacted events
     pub unsigned: Option<UnsignedData>,
     // state event
