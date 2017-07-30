@@ -32,7 +32,7 @@ fn deser_events() {
         print!("test deser_events: parsing {:32} ", filename);
         match parsed {
             Ok(res) => {
-                println!("which is ");
+                print!("which is ");
                 match res {
                     EventTypes::EphemeralEvent(_) => {
                         println!("EphemeralEvent");
