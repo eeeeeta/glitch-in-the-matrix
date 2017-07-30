@@ -6,7 +6,10 @@ extern crate rpassword;
 use futures::{Future, Stream};
 use tokio_core::reactor::Core;
 use gm::{MatrixClient, MatrixFuture};
-use gm::types::{EventTypes, Content, Message};
+// use gm::types::{EventTypes, Content, Message};
+use gm::types::messages::{Message};
+use gm::types::content::{Content};
+use gm::types::events::{EventTypes};
 use rpassword::prompt_password_stdout;
 use std::env;
 
@@ -24,7 +27,7 @@ fn main() {
     let hdl = core.handle();
     let mut mx = core.run(MatrixClient::login(username, password, server, &hdl)).unwrap();
     println!("[+] Connected to {} as {}",server,username);
-    let mut ss = mx.get_sync_stream();
+    let ss = mx.get_sync_stream();
     let mut first = true;
     let fut = ss.for_each(|sync| {
         let mut futs: Vec<MatrixFuture<()>> = vec![];
@@ -41,7 +44,7 @@ fn main() {
                         }
                         // tell the server we have read the event
                         futs.push(Box::new(mx.read_receipt(&rid, &event.event_id).map(|_| ())));
-                        if let Content::RoomMessage(m) = event.content {
+                        if let Content::Message(m) = event.content {
                             if let Message::Text { body, .. } = m {
                                 futs.push(Box::new(mx.send_simple(&rid, body).map(|_| ())));
                             }

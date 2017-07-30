@@ -1,7 +1,9 @@
 extern crate glitch_in_the_matrix as matrix_api;
 extern crate serde_json;
 
-use matrix_api::types::{SyncReply,EventTypes};
+use matrix_api::types::replies::{SyncReply};
+use matrix_api::types::events::{EventTypes};
+
 use std::fs;
 use std::io;
 use std::path;
@@ -34,12 +36,15 @@ fn deser_events() {
             Ok(res) => {
                 print!("which is ");
                 match res {
-                    EventTypes::EphemeralEvent(_) => {
-                        println!("EphemeralEvent");
+                    // EventTypes::EphemeralEvent(_) => {
+                    //     println!("EphemeralEvent");
+                    // },
+                    // EventTypes::InviteStateEvent(_) => {
+                    //     println!("InviteStateEvent");
+                    // }
+                    EventTypes::MinimalEvent(_) => {
+                        println!("MinimalEvent");
                     },
-                    EventTypes::InviteStateEvent(_) => {
-                        println!("InviteStateEvent");
-                    }
                     EventTypes::RedactedEvent(_) => {
                         println!("RedactEvent");
                     }
