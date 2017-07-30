@@ -4,6 +4,7 @@ extern crate serde_json;
 use matrix_api::types::{SyncReply,EventTypes};
 use std::fs;
 use std::io;
+use std::path;
 
 fn read_file(file: &str) -> String {
     let mut text = String::new();
@@ -17,19 +18,21 @@ fn read_file(file: &str) -> String {
 #[test]
 fn deser_events() {
     let mut failed = false;
-    let paths = fs::read_dir("tests/event-examples").unwrap();
+    let rd: fs::ReadDir = fs::read_dir("tests/event-examples").unwrap();
+    // tunrs a ReadDir into a vec of PathBuf
+    let mut paths: Vec<path::PathBuf> = rd.map(|entry| {entry.unwrap().path()}).collect();
+    paths.sort();
     println!("test deser_events: trying to parse events");
-    for path in paths {
-        let path = path.unwrap();
-        let filename = path.file_name();
+    for path in paths.iter() {
+        let filename = path.file_name().unwrap();
         let filename = filename.to_str().unwrap();
-        let path = path.path();
         let path = path.to_str().unwrap();
         let text = read_file(&path);
         let parsed = ::serde_json::from_str::<EventTypes>(&text);
-        print!("test deser_events: parsing {:32} which is ", filename);
+        print!("test deser_events: parsing {:32} ", filename);
         match parsed {
             Ok(res) => {
+                println!("which is ");
                 match res {
                     EventTypes::EphemeralEvent(_) => {
                         println!("EphemeralEvent");
