@@ -33,7 +33,7 @@ pub mod errors {
             HttpCode(c: ::hyper::StatusCode) {
                 display("HTTP error: {}", c.canonical_reason().unwrap_or("unknown"))
             }
-            BadRequest(e: super::types::BadRequestReply) {
+            BadRequest(e: super::types::replies::BadRequestReply) {
                 display("Bad request: {:?}", e)
             }
         }
@@ -49,7 +49,9 @@ pub mod types;
 
 use errors::*;
 use errors::MatrixErrorKind::*;
-use types::*;
+use types::replies::*;
+use types::content::{Presence};
+use types::messages::{Message};
 use hyper::{Method, Body, StatusCode};
 use Method::*;
 use hyper::client::{Response, HttpConnector, Request};
@@ -109,6 +111,8 @@ impl<T: Deserialize> Future for ResponseWrapper<T> {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         let resp = try_ready!(self._poll());
+        #[cfg(feature="gitm_show_responses")]
+        println!("{:#}", String::from_utf8(resp.to_vec()).unwrap());
         let data = serde_json::from_slice::<T>(&resp)?;
         Ok(Async::Ready(data))
     }
@@ -284,14 +288,22 @@ impl MatrixClient {
     /// Wrapper function that sends a `Message::Notice` with the specified unformatted text
     /// to the given room ID. Provided for convenience purposes.
     pub fn send_simple<T: Into<String>>(&mut self, roomid: &str, msg: T) -> MatrixFuture<SendReply> {
-        let msg = Message::Notice { body: msg.into(), formatted_body: None, format: None };
+        let msg = Message::Notice {
+            body: msg.into(),
+            formatted_body: None,
+            format: None
+        };
         self.send(roomid, msg)
     }
     /// Wrapper function that sends a `Message::Notice` with the specified HTML-formatted text
     /// (and accompanying unformatted text, if given) to the given room ID.
     pub fn send_html<T: Into<String>, U: Into<Option<String>>>(&mut self, roomid: &str, msg: T, unformatted: U) -> MatrixFuture<SendReply> {
         let m = msg.into();
-        let msg = Message::Notice { body: unformatted.into().unwrap_or(m.clone()), formatted_body: Some(m), format: Some("org.matrix.custom.html".into()) };
+        let msg = Message::Notice {
+            body: unformatted.into().unwrap_or(m.clone()),
+            formatted_body: Some(m),
+            format: Some("org.matrix.custom.html".into())
+        };
         self.send(roomid, msg)
     }
     /// Upload some data (convertible to a `Body`) of a given `ContentType`, like an image.
@@ -389,6 +401,7 @@ impl MatrixClient {
                  .and_then(UnitaryResponseWrapper::wrap))
     }
 }
+
 impl Drop for MatrixClient {
     /// Invalidates our access token, so we don't have millions of devices.
     /// Also sets us as offline.

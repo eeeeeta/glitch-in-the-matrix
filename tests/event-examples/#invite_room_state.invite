@@ -1,0 +1,7 @@
+{
+  "type": "m.room.join_rules",
+  "state_key": "",
+  "content": {
+    "join_rule": "invite"
+  }
+}
