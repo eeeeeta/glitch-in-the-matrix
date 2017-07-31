@@ -41,6 +41,31 @@ pub struct Image {
     pub thumbnail_info: Option<ImageInfo>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Offer {
+    /// The type of session description. Must be 'offer'.
+    session_type: String,
+    /// The SDP text of the session description.
+    sdp: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Candidate {
+    /// Required. The SDP media type this candidate is intended for.
+    sdp_m_id: String,
+    /// Required. The index of the SDP 'm' line this candidate is intended for.
+    sdp_m_line_index: i32,
+    /// Required. The SDP 'a' line of the candidate.
+    candidate: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Answer {
+    // Required. The type of session description. Must be 'answer'.
+    session_type: String,
+    // Required. The SDP text of the session description.
+    sdp: String,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
@@ -139,6 +164,46 @@ pub enum Message {
         msgtype: String,
         /// A geo URI representing this location.
         geo_uri: String
+    },
+    #[serde(rename="m.call.invite")]
+    /// This event is sent by the caller when they wish to establish a call.
+    CallInvite {
+        /// Required. A unique identifer for the call.
+        call_id: String,
+        /// Required. The session description object
+        offer: Offer,
+        /// Required. The version of the VoIP specification this message adheres to. This specification is version 0.
+        version: i32,
+        /// Required. The time in milliseconds that the invite is valid for. Once the invite age exceeds this value, clients should discard it. They should also no longer show the call as awaiting an answer in the UI.
+        lifetime: i32,
+    },
+    #[serde(rename="m.call.candidates")]
+    /// This event is sent by callers after sending an invite and by the callee after answering. Its purpose is to give the other party additional ICE candidates to try using to communicate.
+    CallCandidates {
+        ///Required. The ID of the call this event relates to.
+        call_id: String,
+        /// Required. Array of objects describing the candidates.
+        candidates: Vec<Candidate>,
+        /// Required. The version of the VoIP specification this messages adheres to. This specification is version 0.
+        version: i32,
+    },
+    #[serde(rename="m.call.answer")]
+    /// This event is sent by the callee when they wish to answer the call.
+    CallAnswer {
+        /// Required. The ID of the call this event relates to.
+        call_id: String,
+        /// Required. The session description object
+        answer: Answer,
+        /// Required. The version of the VoIP specification this message adheres to. This specification is version 0.
+        version: i32,
+    },
+    #[serde(rename="m.call.hangup")]
+    /// Sent by either party to signal their termination of the call. This can be sent either once the call has has been established or before to abort the call.
+    CallHangup {
+        /// Required. The ID of the call this event relates to.
+        call_id: String,
+        /// Required. The version of the VoIP specification this message adheres to. This specification is version 0.
+        version: i32,
     },
 }
 
