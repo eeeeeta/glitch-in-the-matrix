@@ -22,26 +22,6 @@ pub struct FileInfo {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-/// This message represents a single image and an optional thumbnail.
-/// Information about an image and it's thumbnail.
-pub struct Image {
-    /// A textual representation of the image. This could be the alt text of the image,
-    /// the filename of the image, or some kind of content description for accessibility
-    /// e.g. 'image attachment'.
-    pub body: String,
-    /// must be m.image
-    pub msgtype: String,
-    /// The URL to the image.
-    pub url: String,
-    /// Metadata about the image referred to in url.
-    pub info: Option<ImageInfo>,
-    /// The URL to the thumbnail of the image.
-    pub thumbnail_url: Option<String>,
-    /// Metadata about the image referred to in thumbnail_url.
-    pub thumbnail_info: Option<ImageInfo>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 pub struct Offer {
     /// The type of session description. Must be 'offer'.
     session_type: String,
@@ -206,37 +186,3 @@ pub enum Message {
         version: i32,
     },
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//

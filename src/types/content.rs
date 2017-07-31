@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use ::types::messages::{ImageInfo};
+use types::messages::{ImageInfo};
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all="snake_case")]
@@ -23,7 +23,7 @@ pub enum JoinRule {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all="snake_case")]
-/// Defines what Membership a user in a room
+/// Possible membership states of a user
 pub enum Membership {
     Invite,
     Join,
@@ -35,7 +35,7 @@ pub enum Membership {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all="snake_case")]
-/// Defines what Membership a user in a room
+/// Possible types for a m.room.message.feedback event
 pub enum FeedbackType {
     Read,
     Delivered,
@@ -43,7 +43,7 @@ pub enum FeedbackType {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all="snake_case")]
-/// Defines what Membership a user in a room
+/// Who can see the room history
 pub enum HistoryVisibility {
     Invited,
     Joined,
@@ -52,7 +52,7 @@ pub enum HistoryVisibility {
 }
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all="snake_case")]
-/// Wether guests can join this room
+/// Whether guests can join a room
 pub enum GuestAccess {
     CanJoin,
     Forbidden,
@@ -61,24 +61,24 @@ pub enum GuestAccess {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Receipts {
     #[serde(rename="m.read")]
-    read: HashMap<String,Receipt>
+    pub read: HashMap<String,Receipt>
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Receipt {
-    ts: u64,
+    pub ts: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PublicKey {
-    public_key: String,
-    key_validity_url: Option<String>,
+    pub public_key: String,
+    pub key_validity_url: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RoomTag {
     // can be a number or a string
-    order: Option<::serde_json::Value>,
+    pub order: Option<::serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -99,7 +99,7 @@ pub enum Content {
         avatar_url: Option<String>,
         displayname: Option<String>,
         membership: Membership,
-        is_direct: 	Option<bool>,
+        is_direct: Option<bool>,
         third_party_invite: Option<::serde_json::Value>,
     },
     #[serde(rename="m.room.power_levels")]
@@ -163,14 +163,6 @@ pub enum Content {
     Tag { tags: HashMap<String,RoomTag> },
     #[serde(rename="m.direct")]
     Direct( HashMap<String,Vec<String>> ),
-    // #[serde(rename="m.")]
-    //  { },
-    // #[serde(rename="m.room.")]
-    // Room { },
-    // #[serde(rename="m.presence")]
-    // Presence(Presence),
     #[cfg(not(feature="gitm_deny_unknown"))]
     Unknown(::serde_json::Value),
 }
-
-//
