@@ -1,5 +1,8 @@
 [package]
-authors = ["eeeeeta <eeeeeta@users.noreply.github.com>"]
+authors = [
+    "eeeeeta <eeeeeta@users.noreply.github.com>",
+    "digital <coding@digitalville.de>"
+]
 description = "A set of matrix.org bindings for Rust."
 documentation = "http://docs.rs/glitch-in-the-matrix"
 homepage = "https://github.com/eeeeeta/glitch-in-the-matrix"
@@ -8,7 +11,7 @@ license = "CC0-1.0"
 name = "glitch-in-the-matrix"
 readme = "README.md"
 repository = "https://github.com/eeeeeta/glitch-in-the-matrix"
-version = "0.5.0"
+version = "0.6.0"
 
 [dependencies]
 error-chain = "0.10"
@@ -19,6 +22,8 @@ serde = "0.9"
 serde_derive = "0.9"
 serde_json = "0.9"
 tokio-core = "0.1"
+
+[dev-dependencies]
 rpassword = "0.4.2"
 
 [features]
