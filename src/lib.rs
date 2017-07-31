@@ -266,6 +266,8 @@ impl MatrixClient {
             Ok(x) => x,
             Err(e) => return Box::new(futures::future::err(e.into()))
         };
+        let pres = format!("{{\"presence\": {}}}",pres);
+        println!("{}",pres);
         self.discarding_req(Put, &uri, vec![], Some(pres.into()))
     }
     /// Send a read receipt for a given event ID.
