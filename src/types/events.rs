@@ -66,8 +66,6 @@ pub struct Event {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
-/// for now events have to exactly follow the specs
-/// the different event types
 pub enum EventTypes {
     Event(Event),
     RedactedEvent(RedactedEvent),
