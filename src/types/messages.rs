@@ -48,7 +48,7 @@ pub struct Answer {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(untagged)]
+#[serde(tag="msgtype")]
 /// A message sent to a room.
 pub enum Message {
     #[serde(rename="m.text")]
@@ -56,8 +56,6 @@ pub enum Message {
     Text{
         /// The body of the message.
         body: String,
-        /// must be m.text
-        msgtype: String,
         /// The formatted body of the message (if the message is formatted).
         #[serde(default)]
         formatted_body: Option<String>,
@@ -76,8 +74,6 @@ pub enum Message {
     Notice{
         /// The notice text to send.
         body: String,
-        /// must be m.notice
-        msgtype: String,
         /// The formatted body of the message (if the message is formatted).
         #[serde(default)]
         formatted_body: Option<String>,
@@ -93,8 +89,6 @@ pub enum Message {
         /// the filename of the image, or some kind of content description for accessibility
         /// e.g. 'image attachment'.
         body: String,
-        /// must be m.image
-        msgtype: String,
         /// The URL to the image.
         url: String,
         /// Metadata about the image referred to in url.
@@ -112,8 +106,6 @@ pub enum Message {
     Emote{
         /// The emote action to perform.
         body: String,
-        /// must be m.emote
-        msgtype: String,
     },
     #[serde(rename="m.file")]
     /// This message represents a generic file.
@@ -121,8 +113,6 @@ pub enum Message {
         /// A human-readable description of the file. This is recommended to be the filename
         /// of the original upload.
         body: String,
-        /// must be m.string
-        msgtype: String,
         /// The original filename of the uploaded file.
         filename: String,
         /// Information about the file referred to in url.
@@ -140,8 +130,6 @@ pub enum Message {
     Location{
         /// description for accessibility e.g. 'location attachment'.
         body: String,
-        /// must be m.location
-        msgtype: String,
         /// A geo URI representing this location.
         geo_uri: String
     },

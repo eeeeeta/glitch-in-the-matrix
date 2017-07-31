@@ -290,7 +290,6 @@ impl MatrixClient {
     pub fn send_simple<T: Into<String>>(&mut self, roomid: &str, msg: T) -> MatrixFuture<SendReply> {
         let msg = Message::Notice{
             body: msg.into(),
-            msgtype: String::from("m.notice"),
             formatted_body: None,
             format: None
         };
@@ -302,7 +301,6 @@ impl MatrixClient {
         let m = msg.into();
         let msg = Message::Notice{
             body: unformatted.into().unwrap_or(m.clone()),
-            msgtype: String::from("m.notice"),
             formatted_body: Some(m),
             format: Some("org.matrix.custom.html".into())
         };
