@@ -36,20 +36,17 @@ fn deser_events() {
             Ok(res) => {
                 print!("which is ");
                 match res {
-                    // EventTypes::EphemeralEvent(_) => {
-                    //     println!("EphemeralEvent");
-                    // },
-                    // EventTypes::InviteStateEvent(_) => {
-                    //     println!("InviteStateEvent");
-                    // }
                     EventTypes::MinimalEvent(_) => {
                         println!("MinimalEvent");
                     },
                     EventTypes::RedactedEvent(_) => {
                         println!("RedactEvent");
-                    }
+                    },
                     EventTypes::Event(_) => {
                         println!("Event");
+                    },
+                    _ => {
+                        println!("Unknown");
                     }
                 }
             },
