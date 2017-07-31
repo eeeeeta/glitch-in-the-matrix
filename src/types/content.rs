@@ -161,15 +161,15 @@ pub enum Content {
     },
     #[serde(rename="m.tag")]
     Tag { tags: HashMap<String,RoomTag> },
-    // #[serde(rename="m.")]
-    //  { },
+    #[serde(rename="m.direct")]
+    Direct( HashMap<String,Vec<String>> ),
     // #[serde(rename="m.")]
     //  { },
     // #[serde(rename="m.room.")]
     // Room { },
     // #[serde(rename="m.presence")]
     // Presence(Presence),
-    #[cfg(not(feature="gitm_deny_unknown_event_content"))]
+    #[cfg(not(feature="gitm_deny_unknown"))]
     Unknown(::serde_json::Value),
 }
 

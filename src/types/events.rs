@@ -10,31 +10,9 @@ pub struct UnsignedData {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(deny_unknown_fields)]
-/// Events like m.typing
-pub struct EphemeralEvent {
-    #[serde(rename="type")]
-    pub event_type: String,
-    pub content: Content,
-    pub room_id: Option<String>,
-    pub event_id: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(deny_unknown_fields)]
-/// Event in invite_room_state
-pub struct InviteStateEvent {
-    #[serde(rename="type")]
-    pub event_type: String,
-    pub content: Content,
-    pub sender: Option<String>,
-    pub state_key: Option<String>,
-}
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(deny_unknown_fields)]
+#[cfg_attr(not(feature="gitm_deny_unknown") ,serde(deny_unknown_fields))]
 /// A redact event
 pub struct RedactedEvent {
-    // event
     #[serde(rename="type")]
     pub event_type: String,
     pub content: Content,
@@ -45,8 +23,9 @@ pub struct RedactedEvent {
     pub sender: Option<String>,
     pub redacted_because: Event
 }
+
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(deny_unknown_fields)]
+#[cfg_attr(not(feature="gitm_deny_unknown") ,serde(deny_unknown_fields))]
 /// Ephemeral events (like m.typing). of course, that could be included in Event, but then we have three more values being wrapped in Option.
 pub struct MinimalEvent {
     #[serde(rename="type")]
@@ -57,10 +36,10 @@ pub struct MinimalEvent {
     pub sender: Option<String>,
     pub state_key: Option<String>,
 }
+
 /// An event in a room.
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(deny_unknown_fields)]
-// #[cfg_attr(features="must_match_fields",
+#[cfg_attr(not(feature="gitm_deny_unknown") ,serde(deny_unknown_fields))]
 pub struct Event {
     // event
     #[serde(rename="type")]
@@ -77,7 +56,7 @@ pub struct Event {
     pub state_key: Option<String>,
     pub prev_content: Option<Content>,
     pub prev_sender: Option<String>,
-    pub invite_room_state: Option<Vec<InviteStateEvent>>,
+    pub invite_room_state: Option<Vec<MinimalEvent>>,
     // extra
     pub age: Option<u64>,
     pub txn_id: Option<String>,
@@ -87,13 +66,14 @@ pub struct Event {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
-// #[serde(deny_unknown_fields)]
 /// for now events have to exactly follow the specs
 /// the different event types
 pub enum EventTypes {
     Event(Event),
     RedactedEvent(RedactedEvent),
     MinimalEvent(MinimalEvent),
+    #[cfg(not(feature="gitm_deny_unknown"))]
+    UnknownEvent(::serde_json::Value),
 }
 
 

@@ -22,5 +22,5 @@ tokio-core = "0.1"
 rpassword = "0.4.2"
 
 [features]
-gitm_deny_unknown_event_content = []
+gitm_deny_unknown = []
 gitm_show_responses = []
