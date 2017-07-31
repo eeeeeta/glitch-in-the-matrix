@@ -1,6 +1,7 @@
 [package]
 authors = [
     "eeeeeta <eeeeeta@users.noreply.github.com>",
+    "digital <coding@digitalville.de>"
 ]
 description = "A set of matrix.org bindings for Rust."
 documentation = "http://docs.rs/glitch-in-the-matrix"
@@ -10,7 +11,7 @@ license = "CC0-1.0"
 name = "glitch-in-the-matrix"
 readme = "README.md"
 repository = "https://github.com/eeeeeta/glitch-in-the-matrix"
-version = "0.6.1"
+version = "0.6.2"
 
 [dependencies]
 error-chain = "0.10"
