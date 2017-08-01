@@ -63,6 +63,7 @@ use serde::Deserialize;
 use tokio_core::reactor::Handle;
 use futures::*;
 use std::marker::PhantomData;
+use std::collections::HashMap;
 use futures::stream::Concat2;
 
 /// A `Future` with a `MatrixError` error type. Returned by most library
@@ -219,9 +220,10 @@ pub struct MatrixClient {
     hyper: hyper::Client<HttpsConnector<HttpConnector>>,
     access_token: String,
     hdl: Handle,
+    format_table: HashMap<String,String>,
     user_id: String,
     url: String,
-    txnid: u32
+    txnid: u32,
 }
 impl MatrixClient {
     /// Log in to a Matrix homeserver, and return a client object.
@@ -247,14 +249,17 @@ impl MatrixClient {
         let hdl = hdl.clone();
         let url = url.to_string();
         Box::new(resp.map(move |rpl| {
-            MatrixClient {
+            let mut mx = MatrixClient {
                 hyper: client,
                 access_token: rpl.access_token,
                 user_id: rpl.user_id,
+                format_table: HashMap::new(),
                 url: url,
                 hdl: hdl,
                 txnid: 0
-            }
+            };
+            mx.format_table.insert("user_id".to_string(), mx.user_id.clone().to_string());
+            mx
         }))
     }
     /// Join a room by identifier or alias.
