@@ -22,6 +22,7 @@ serde = "0.9"
 serde_derive = "0.9"
 serde_json = "0.9"
 tokio-core = "0.1"
+strfmt = "0.1.5"
 
 [dev-dependencies]
 rpassword = "0.4.2"

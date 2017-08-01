@@ -15,6 +15,7 @@ extern crate hyper_openssl;
 #[macro_use] extern crate error_chain;
 extern crate tokio_core;
 #[macro_use] extern crate futures;
+extern crate strfmt;
 
 pub mod errors {
     //! Error handling, using `error_chain`.
@@ -52,6 +53,7 @@ use errors::MatrixErrorKind::*;
 use types::replies::*;
 use types::content::{Presence};
 use types::messages::{Message};
+use types::requests as req;
 use hyper::{Method, Body, StatusCode};
 use Method::*;
 use hyper::client::{Response, HttpConnector, Request};
@@ -260,15 +262,13 @@ impl MatrixClient {
         self.req(Post, &format!("/join/{}", roomid), vec![], None)
     }
     /// Update our presence status.
-    pub fn update_presence(&mut self, p: Presence) -> MatrixFuture<()> {
-        let uri = format!("/presence/{}/status", self.user_id);
-        let pres = match serde_json::to_string(&p) {
-            Ok(x) => x,
-            Err(e) => return Box::new(futures::future::err(e.into()))
-        };
-        let pres = format!("{{\"presence\": {}}}",pres);
-        println!("{}",pres);
-        self.discarding_req(Put, &uri, vec![], Some(pres.into()))
+    pub fn update_presence(&mut self, presence: Presence, status_msg: Option<String>) -> MatrixFuture<()> {
+        req::Request {
+            method: Put,
+            endpoint: format!("/presence/{}/status", self.user_id),
+            params: vec!(),
+            body: req::Presence { presence, status_msg,}
+        }.discarding_send(self)
     }
     /// Send a read receipt for a given event ID.
     pub fn read_receipt(&mut self, roomid: &str, eventid: &str) -> MatrixFuture<()> {

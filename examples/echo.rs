@@ -7,7 +7,7 @@ use futures::{Future, Stream};
 use tokio_core::reactor::Core;
 use gm::{MatrixClient, MatrixFuture};
 use gm::types::messages::{Message};
-use gm::types::content::{Content};
+use gm::types::content::{Content,Presence};
 use gm::types::events::{EventTypes};
 use rpassword::prompt_password_stdout;
 use std::env;
@@ -25,6 +25,7 @@ fn main() {
     let mut core = Core::new().unwrap();
     let hdl = core.handle();
     let mut mx = core.run(MatrixClient::login(username, password, server, &hdl)).unwrap();
+    core.run(mx.update_presence(Presence::Online,Some("I am a LOL".to_string()))).unwrap();
     println!("[+] Connected to {} as {}", server, username);
     let ss = mx.get_sync_stream();
     // We discard the results of the initial `/sync`, because we only want to echo
