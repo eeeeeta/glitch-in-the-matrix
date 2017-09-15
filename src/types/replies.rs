@@ -1,9 +1,10 @@
 use std::collections::HashMap;
+use room::Room;
 use ::types::events::{Events};
 
 /// Information about a room's events.
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Room {
+pub struct RoomEvents {
     #[serde(default)]
     pub state: Events,
     #[serde(default)]
@@ -13,11 +14,11 @@ pub struct Room {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SyncRooms {
     #[serde(default)]
-    pub join: HashMap<String, Room>,
+    pub join: HashMap<Room<'static>, RoomEvents>,
     #[serde(default)]
-    pub invite: HashMap<String, Room>,
+    pub invite: HashMap<Room<'static>, RoomEvents>,
     #[serde(default)]
-    pub leave: HashMap<String, Room>
+    pub leave: HashMap<Room<'static>, RoomEvents>
 }
 /// The reply obtained from `sync()`.
 #[derive(Deserialize, Debug)]
@@ -38,7 +39,8 @@ pub struct UploadReply {
 /// The reply obtained from `/join`.
 #[derive(Deserialize, Debug)]
 pub struct JoinReply {
-    pub room_id: String
+    #[serde(rename = "room_id")]
+    pub room: Room<'static>
 }
 /// The reply obtained from `/login`.
 #[derive(Deserialize, Debug)]
@@ -46,6 +48,13 @@ pub struct LoginReply {
     pub user_id: String,
     pub access_token: String,
     pub home_server: String
+}
+/// The reply obtained from getting a room alias.
+#[derive(Deserialize, Debug)]
+pub struct RoomAliasReply {
+    #[serde(rename = "room_id")]
+    pub room: Room<'static>,
+    pub servers: Vec<String>
 }
 /// The reply obtained when something's gone wrong.
 #[derive(Deserialize, Debug)]

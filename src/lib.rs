@@ -47,13 +47,13 @@ pub mod http {
     pub use hyper::header::ContentType;
 }
 pub mod types;
+pub mod room;
 mod util;
 
 use util::*;
 use errors::*;
 use types::replies::*;
 use types::content::{Presence};
-use types::messages::{Message};
 use hyper::{Method, Body};
 use Method::*;
 use hyper::client::{HttpConnector, Request};
@@ -188,6 +188,22 @@ impl<'a> MatrixRequest<'a, ()> {
         }
     }
 }
+impl<'a, 'b, 'c> MatrixRequest<'a, HashMap<Cow<'b, str>, Cow<'c, str>>> {
+    pub fn new_with_body<S, T, U, V>(meth: Method, endpoint: S, body: V) -> Self
+        where S: Into<Cow<'a, str>>,
+              T: Into<Cow<'b, str>>,
+              U: Into<Cow<'c, str>>,
+              V: IntoIterator<Item=(T, U)> {
+        let body = body.into_iter().map(|(t, u)| (t.into(), u.into()))
+            .collect();
+        Self {
+            meth,
+            endpoint: endpoint.into(),
+            params: HashMap::new(),
+            body
+        }
+    }
+}
 
 impl<'a, T> MatrixRequest<'a, T> where T: Serialize {
     fn body(&self) -> MatrixResult<Option<Body>> {
@@ -310,44 +326,6 @@ impl MatrixClient {
                 "presence": p
             })
         }.discarding_send(self)
-    }
-    /// Send a read receipt for a given event ID.
-    pub fn read_receipt(&mut self, roomid: &str, eventid: &str) -> MatrixFuture<()> {
-        MatrixRequest::new_basic(Post, format!("/rooms/{}/receipt/m.read/{}", roomid, eventid))
-            .discarding_send(self)
-    }
-    /// Send a message to a room ID.
-    pub fn send(&mut self, roomid: &str, msg: Message) -> MatrixFuture<SendReply> {
-        self.txnid += 1;
-        MatrixRequest {
-            meth: Put,
-            endpoint: format!("/rooms/{}/send/m.room.message/{}",
-                              roomid,
-                              self.txnid).into(),
-            params: HashMap::new(),
-            body: msg
-        }.send(self)
-    }
-    /// Wrapper function that sends a `Message::Notice` with the specified unformatted text
-    /// to the given room ID. Provided for convenience purposes.
-    pub fn send_simple<T: Into<String>>(&mut self, roomid: &str, msg: T) -> MatrixFuture<SendReply> {
-        let msg = Message::Notice {
-            body: msg.into(),
-            formatted_body: None,
-            format: None
-        };
-        self.send(roomid, msg)
-    }
-    /// Wrapper function that sends a `Message::Notice` with the specified HTML-formatted text
-    /// (and accompanying unformatted text, if given) to the given room ID.
-    pub fn send_html<T: Into<String>, U: Into<Option<String>>>(&mut self, roomid: &str, msg: T, unformatted: U) -> MatrixFuture<SendReply> {
-        let m = msg.into();
-        let msg = Message::Notice {
-            body: unformatted.into().unwrap_or(m.clone()),
-            formatted_body: Some(m),
-            format: Some("org.matrix.custom.html".into())
-        };
-        self.send(roomid, msg)
     }
     /// Upload some data (convertible to a `Body`) of a given `ContentType`, like an image.
     ///

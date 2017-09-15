@@ -1,4 +1,5 @@
 use super::content::{Content};
+use room::Room;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UnsignedData {
@@ -19,7 +20,8 @@ pub struct RedactedEvent {
     pub prev_sender: Option<String>,
     pub prev_content: Option<Content>,
     pub event_id: Option<String>,
-    pub room_id: Option<String>,
+    #[serde(rename = "room_id")]
+    pub room: Option<Room<'static>>,
     pub sender: Option<String>,
     pub redacted_because: Event
 }
@@ -31,7 +33,8 @@ pub struct MinimalEvent {
     #[serde(rename="type")]
     pub event_type: String,
     pub content: Content,
-    pub room_id: Option<String>,
+    #[serde(rename = "room_id")]
+    pub room: Option<Room<'static>>,
     pub event_id: Option<String>,
     pub sender: Option<String>,
     pub state_key: Option<String>,
@@ -49,7 +52,8 @@ pub struct Event {
     pub event_id: String,
     pub sender: String,
     pub origin_server_ts: u64,
-    pub room_id: Option<String>,
+    #[serde(rename = "room_id")]
+    pub room: Option<Room<'static>>,
     // can be recursive until we differ between redacted and not redacted events
     pub unsigned: Option<UnsignedData>,
     // state event

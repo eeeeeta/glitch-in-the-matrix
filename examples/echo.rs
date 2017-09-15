@@ -31,8 +31,8 @@ fn main() {
     // new requests.
     let fut = ss.skip(1).for_each(|sync| {
         let mut futs: Vec<MatrixFuture<()>> = vec![];
-        for (rid, room) in sync.rooms.join {
-            for event in room.timeline.events {
+        for (room, events) in sync.rooms.join {
+            for event in events.timeline.events {
                 // we only want messages, so we ignore the other event types
                 if let EventTypes::Event(event) = event {
                     // only echo messages from other users
@@ -40,10 +40,11 @@ fn main() {
                         continue;
                     }
                     // tell the server we have read the event
-                    futs.push(Box::new(mx.read_receipt(&rid, &event.event_id).map(|_| ())));
+                    let mut rc = room.cli(&mut mx);
+                    futs.push(Box::new(rc.read_receipt(&event.event_id).map(|_| ())));
                     if let Content::Message(m) = event.content {
                         if let Message::Text { body, .. } = m {
-                            futs.push(Box::new(mx.send_simple(&rid, body).map(|_| ())));
+                            futs.push(Box::new(rc.send_simple(body).map(|_| ())));
                         }
                     }
                 }
