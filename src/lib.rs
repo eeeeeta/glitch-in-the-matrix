@@ -48,6 +48,8 @@ pub mod http {
 }
 pub mod types;
 pub mod room;
+pub mod request;
+pub mod sync;
 mod util;
 
 use util::*;
@@ -60,12 +62,11 @@ use hyper::client::{HttpConnector, Request};
 use hyper_openssl::HttpsConnector;
 use hyper::header::ContentType;
 use serde::de::DeserializeOwned;
-use std::borrow::Cow;
-use serde::Serialize;
 use std::collections::HashMap;
 use tokio_core::reactor::Handle;
 use futures::*;
-use percent_encoding::{utf8_percent_encode, DEFAULT_ENCODE_SET};
+use request::MatrixRequest;
+use sync::SyncStream;
 
 /// A `Future` with a `MatrixError` error type. Returned by most library
 /// functions.
@@ -74,200 +75,6 @@ use percent_encoding::{utf8_percent_encode, DEFAULT_ENCODE_SET};
 /// for `impl Trait` to arrive to save us from this madness.
 pub type MatrixFuture<T> = Box<Future<Item=T, Error=MatrixError>>;
 
-/// A `Stream` that yields constant replies to `/sync`.
-///
-/// This calls the long-polling `/sync` API, which will wait until replies come
-/// in and send them to the client. If you want to reduce the wait time, use the
-/// `set_timeout()` function.
-pub struct SyncStream {
-    hyper: hyper::Client<HttpsConnector<HttpConnector>>,
-    last_batch: Option<String>,
-    set_presence: bool,
-    access_token: String,
-    url: String,
-    timeout: u64,
-    cur_req: Option<MatrixFuture<SyncReply>>
-}
-impl SyncStream {
-    /// Set whether polling the `/sync` API marks us as online.
-    pub fn set_sync_sets_presence(&mut self, v: bool) {
-        self.set_presence = v;
-    }
-    /// Ascertain whether polling the `/sync` API marks us as online.
-    ///
-    /// The default value is `true`; `/sync` sets presence.
-    pub fn sync_sets_presence(&self) -> bool {
-        self.set_presence
-    }
-    /// Get the current long-polling timeout.
-    pub fn timeout(&self) -> u64 {
-        self.timeout
-    }
-    /// Set a timeout (in milliseconds) for the server long-polling, after which
-    /// the homeserver should return a blank reply instead of continuing to wait
-    /// for new events.
-    ///
-    /// The default value is `30000` (30 seconds).
-    ///
-    /// This does not guard against other problems, such as connection loss;
-    /// this merely *asks* the HS for a given timeout.
-    pub fn set_timeout(&mut self, timeout: u64) {
-        self.timeout = timeout;
-    }
-    fn req(&mut self) -> Request {
-        let mut params = vec![];
-        params.push(format!("set_presence={}", if self.set_presence {
-            "online"
-        } else { "offline" }));
-        if let Some(ref b) = self.last_batch {
-            params.push(format!("since={}", b));
-            params.push(format!("timeout={}", self.timeout));
-        }
-        Request::new(Get, format!("{}/_matrix/client/r0/sync?access_token={}&{}",
-                                  self.url,
-                                  &self.access_token,
-                                  params.join("&")
-        ).parse().unwrap())
-    }
-}
-
-impl Stream for SyncStream {
-    type Item = SyncReply;
-    type Error = MatrixError;
-
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        loop {
-            if self.cur_req.is_some() {
-                match self.cur_req.as_mut().unwrap().poll() {
-                    Ok(Async::Ready(rpl)) => {
-                        self.last_batch = Some(rpl.next_batch.clone());
-                        self.cur_req = None;
-                        return Ok(Async::Ready(Some(rpl)));
-                    },
-                    Ok(Async::NotReady) => {
-                        return Ok(Async::NotReady);
-                    },
-                    Err(e) => {
-                        return Err(e);
-                    }
-                }
-            }
-            let req = self.req();
-            self.cur_req = Some(Box::new(self.hyper.request(req)
-                                         .map_err(|e| e.into())
-                                         .and_then(ResponseWrapper::<SyncReply>::wrap)))
-        }
-    }
-}
-
-/// A arbitrary request to an endpoint in the Matrix API.
-///
-/// This type has Super `Cow` Powers.
-pub struct MatrixRequest<'a, T> {
-    /// Request method (exported in the `http` module)
-    pub meth: Method,
-    /// API endpoint, without `/_matrix/client/r0` (e.g. `/sync`)
-    pub endpoint: Cow<'a, str>,
-    /// Query-string parameters.
-    pub params: HashMap<Cow<'a, str>, Cow<'a, str>>,
-    /// Request body (some type implementing `Serialize`).
-    ///
-    /// If this is empty (serialises to `{}`), it will not be sent. Therefore,
-    /// requests with no body should use `()` here.
-    pub body: T
-}
-impl<'a> MatrixRequest<'a, ()> {
-    /// Convenience method for making a `MatrixRequest` from a method and
-    /// endpoint.
-    pub fn new_basic<S: Into<Cow<'a, str>>>(meth: Method, endpoint: S) -> Self {
-        Self {
-            meth,
-            endpoint: endpoint.into(),
-            params: HashMap::new(),
-            body: ()
-        }
-    }
-}
-impl<'a, 'b, 'c> MatrixRequest<'a, HashMap<Cow<'b, str>, Cow<'c, str>>> {
-    pub fn new_with_body<S, T, U, V>(meth: Method, endpoint: S, body: V) -> Self
-        where S: Into<Cow<'a, str>>,
-              T: Into<Cow<'b, str>>,
-              U: Into<Cow<'c, str>>,
-              V: IntoIterator<Item=(T, U)> {
-        let body = body.into_iter().map(|(t, u)| (t.into(), u.into()))
-            .collect();
-        Self {
-            meth,
-            endpoint: endpoint.into(),
-            params: HashMap::new(),
-            body
-        }
-    }
-}
-
-impl<'a, T> MatrixRequest<'a, T> where T: Serialize {
-    fn body(&self) -> MatrixResult<Option<Body>> {
-        let body = serde_json::to_string(&self.body)?;
-        Ok(if body == "{}" {
-            None
-        }
-        else {
-            Some(body.into())
-        })
-    }
-    /// Makes a hyper `Request` from this type.
-    ///
-    /// The generated `Request` can then be sent to some unsuspecting Matrix
-    /// homeserver using the `send_request()` or `send_discarding_request()`
-    /// methods on `MatrixClient`.
-    pub fn make_hyper(&self, client: &MatrixClient) -> MatrixResult<Request> {
-        let body = self.body()?;
-        let mut params = format!("access_token={}", client.access_token);
-        for (k, v) in self.params.iter() {
-            params += &format!("&{}={}",
-                              utf8_percent_encode(k.as_ref(), DEFAULT_ENCODE_SET),
-                              utf8_percent_encode(v.as_ref(), DEFAULT_ENCODE_SET));
-        }
-        let url = format!("{}/_matrix/client/r0{}?{}",
-                          client.url,
-                          self.endpoint,
-                          params);
-        let mut req = Request::new(self.meth.clone(), url.parse()?);
-        if let Some(b) = body {
-            req.set_body(b);
-        }
-        Ok(req)
-    }
-    /// Sends this request to a Matrix homeserver, expecting a deserializable
-    /// `R` return type.
-    ///
-    /// A helpful mix of `make_hyper()` and `MatrixClient::send_request()`.
-    pub fn send<R>(&self, mxc: &mut MatrixClient) -> MatrixFuture<R> where R: DeserializeOwned + 'static {
-        let req = match self.make_hyper(mxc) {
-            Ok(r) => r,
-            Err(e) => return Box::new(futures::future::err(e.into()))
-        };
-        mxc.send_request(req)
-    }
-    /// Like `send()`, but uses `MatrixClient::send_discarding_request()`.
-    pub fn discarding_send(&self, mxc: &mut MatrixClient) -> MatrixFuture<()> {
-        let req = match self.make_hyper(mxc) {
-            Ok(r) => r,
-            Err(e) => return Box::new(futures::future::err(e.into()))
-        };
-        mxc.send_discarding_request(req)
-    }
-    // incredibly useful and relevant method
-    pub fn moo() -> &'static str {
-        r#"(__)
-         (oo)
-   /------\/
-  / |    ||
- *  /\---/\
-    ~~   ~~
-....Cow::Borrowed("Have you mooed today?")..."#
-    }
-}
 /// A connection to a Matrix homeserver.
 pub struct MatrixClient {
     hyper: hyper::Client<HttpsConnector<HttpConnector>>,

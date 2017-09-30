@@ -2,7 +2,8 @@
 
 use types::replies::*;
 use types::messages::Message;
-use super::{MatrixRequest, MatrixClient, MatrixFuture};
+use super::{MatrixClient, MatrixFuture};
+use request::MatrixRequest;
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use std::borrow::Cow;
 use futures::*;
