@@ -103,6 +103,16 @@ impl<'a, 'b, 'c> RoomClient<'a, 'b, 'c> {
         MatrixRequest::new_basic(Post, format!("/rooms/{}/receipt/m.read/{}", self.room.id, eventid))
             .discarding_send(self.cli)
     }
+/*    /// Looks up the contents of a state event in a room. If the user is joined
+    /// to the room then the state is taken from the current state of the room.
+    /// If the user has left the room then the state is taken from the state of
+    /// the room when they left.
+    ///
+    /// The return value here can be any object that implements `Deserialize`,
+    /// allowing you to use the state API to store arbitrary objects. Common
+    /// state events, such as `m.room.name`, can be found in ...
+    pub fn get_state<T: Deserialize>(&mut self, ev_type: &str, key: Option<&str>) -> MatrixFuture<T> {
+    }*/
     /// Strips all information out of an event which isn't critical to the
     /// integrity of the server-side representation of the room.
     ///

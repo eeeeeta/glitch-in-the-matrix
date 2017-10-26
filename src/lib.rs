@@ -18,6 +18,7 @@ extern crate tokio_core;
 extern crate percent_encoding;
 
 pub mod errors {
+    #![allow(unused_doc_comment)]
     //! Error handling, using `error_chain`.
     error_chain! {
         types {
@@ -55,7 +56,7 @@ mod util;
 use util::*;
 use errors::*;
 use types::replies::*;
-use types::content::{Presence};
+use types::content::root::types::Presence;
 use hyper::{Method, Body};
 use Method::*;
 use hyper::client::{HttpConnector, Request};

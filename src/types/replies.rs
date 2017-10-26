@@ -1,9 +1,10 @@
+//! Replies obtained from calling various API endpoints.
 use std::collections::HashMap;
 use room::Room;
 use ::types::events::{Events};
 
 /// Information about a room's events.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct RoomEvents {
     #[serde(default)]
     pub state: Events,
@@ -11,7 +12,7 @@ pub struct RoomEvents {
     pub timeline: Events,
 }
 /// The `rooms` component of a `SyncReply`.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct SyncRooms {
     #[serde(default)]
     pub join: HashMap<Room<'static>, RoomEvents>,

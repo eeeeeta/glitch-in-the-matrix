@@ -1,4 +1,10 @@
-use super::content::{Content};
+//! Types for representing events.
+//!
+//! For event *content*, see the `content` module.
+use super::content::{Content, deserialize_content};
+use serde::*;
+use serde_json::Value;
+use serde::de;
 use room::Room;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -11,28 +17,24 @@ pub struct UnsignedData {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-#[cfg_attr(not(feature="gitm_deny_unknown") ,serde(deny_unknown_fields))]
-/// A redact event
-pub struct RedactedEvent {
+/// Metadata for a redacted event.
+pub struct MetaRedacted {
     #[serde(rename="type")]
     pub event_type: String,
-    pub content: Content,
     pub prev_sender: Option<String>,
     pub prev_content: Option<Content>,
     pub event_id: Option<String>,
     #[serde(rename = "room_id")]
     pub room: Option<Room<'static>>,
     pub sender: Option<String>,
-    pub redacted_because: Event
+    pub redacted_because: MetaFull
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-#[cfg_attr(not(feature="gitm_deny_unknown") ,serde(deny_unknown_fields))]
-/// Ephemeral events (like m.typing). of course, that could be included in Event, but then we have three more values being wrapped in Option.
-pub struct MinimalEvent {
-    #[serde(rename="type")]
+/// Metadata for an ephemeral event (like m.typing).
+pub struct MetaMinimal {
+    #[serde(rename = "type")]
     pub event_type: String,
-    pub content: Content,
     #[serde(rename = "room_id")]
     pub room: Option<Room<'static>>,
     pub event_id: Option<String>,
@@ -42,12 +44,10 @@ pub struct MinimalEvent {
 
 /// An event in a room.
 #[derive(Serialize, Deserialize, Debug)]
-#[cfg_attr(not(feature="gitm_deny_unknown") ,serde(deny_unknown_fields))]
-pub struct Event {
+pub struct MetaFull {
     // event
     #[serde(rename="type")]
     pub event_type: String,
-    pub content: Content,
     // room event
     pub event_id: String,
     pub sender: String,
@@ -60,7 +60,7 @@ pub struct Event {
     pub state_key: Option<String>,
     pub prev_content: Option<Content>,
     pub prev_sender: Option<String>,
-    pub invite_room_state: Option<Vec<MinimalEvent>>,
+    pub invite_room_state: Option<Vec<MetaMinimal>>,
     // extra
     pub age: Option<u64>,
     pub txn_id: Option<String>,
@@ -70,17 +70,35 @@ pub struct Event {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
-pub enum EventTypes {
-    Event(Event),
-    RedactedEvent(RedactedEvent),
-    MinimalEvent(MinimalEvent),
-    #[cfg(not(feature="gitm_deny_unknown"))]
-    UnknownEvent(::serde_json::Value),
+pub enum EventMetadata {
+    Full(MetaFull),
+    Redacted(MetaRedacted),
+    Minimal(MetaMinimal)
 }
+#[derive(Debug)]
+pub struct Event(pub EventMetadata, pub Content);
 
-
+impl<'de> Deserialize<'de> for Event {
+    fn deserialize<D>(d: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        let v = Value::deserialize(d)?;
+        let content = {
+            let typ = v.get("type").ok_or(de::Error::custom("No event type field"))?;
+            let typ = match *typ {
+                Value::String(ref s) => s as &str,
+                _ => Err(de::Error::custom("Event type is not a string"))?
+            };
+            let content = v.get("content").ok_or(de::Error::custom("No content field"))?;
+            let content = deserialize_content(typ, content.clone())
+                .map_err(|e| de::Error::custom(e.to_string()))?;
+            content
+        };
+        let meta: EventMetadata = ::serde_json::from_value(v)
+            .map_err(|e| de::Error::custom(e.to_string()))?;
+        Ok(Event(meta, content))
+    }
+}
 /// Events in a room.
-#[derive(Serialize, Deserialize, Default, Debug)]
+#[derive(Deserialize, Default, Debug)]
 pub struct Events {
-    pub events: Vec<EventTypes>
+    pub events: Vec<Event>
 }
