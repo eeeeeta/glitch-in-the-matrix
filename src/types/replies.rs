@@ -57,6 +57,12 @@ pub struct RoomAliasReply {
     pub room: Room<'static>,
     pub servers: Vec<String>
 }
+/// The reply obtained when calling `Room::set_state`.
+#[derive(Deserialize, Debug)]
+pub struct SetStateReply {
+    /// A unique identifier for the event.
+    pub event_id: String
+}
 /// The reply obtained when something's gone wrong.
 #[derive(Deserialize, Debug)]
 pub struct BadRequestReply {

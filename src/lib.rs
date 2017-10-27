@@ -20,6 +20,8 @@ extern crate percent_encoding;
 pub mod errors {
     #![allow(unused_doc_comment)]
     //! Error handling, using `error_chain`.
+    //!
+    //! The `StatusCode` enum is re-exported in the `http` module.
     error_chain! {
         types {
             MatrixError, MatrixErrorKind, ResultExt, MatrixResult;
@@ -46,6 +48,7 @@ pub mod http {
     pub use hyper::Method;
     pub use hyper::Body;
     pub use hyper::header::ContentType;
+    pub use hyper::StatusCode;
 }
 pub mod types;
 pub mod room;

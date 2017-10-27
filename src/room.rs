@@ -5,6 +5,7 @@ use types::messages::Message;
 use super::{MatrixClient, MatrixFuture};
 use request::MatrixRequest;
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use serde::de::DeserializeOwned;
 use std::borrow::Cow;
 use futures::*;
 use hyper::Method::*;
@@ -14,7 +15,7 @@ use std::collections::HashMap;
 ///
 /// It's probably best to read the `RoomClient` documentation as well - after
 /// all, that's how you do anything with this room.
-#[derive(Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Room<'a> {
     pub id: Cow<'a, str>
 }
@@ -103,16 +104,42 @@ impl<'a, 'b, 'c> RoomClient<'a, 'b, 'c> {
         MatrixRequest::new_basic(Post, format!("/rooms/{}/receipt/m.read/{}", self.room.id, eventid))
             .discarding_send(self.cli)
     }
-/*    /// Looks up the contents of a state event in a room. If the user is joined
-    /// to the room then the state is taken from the current state of the room.
-    /// If the user has left the room then the state is taken from the state of
-    /// the room when they left.
+    /// Looks up the contents of a state event with type `ev_type` and state key
+    /// `key` in a room. If the user is joined to the room then the state is
+    /// taken from the current state of the room. If the user has left the room
+    /// then the state is taken from the state of the room when they left.
     ///
     /// The return value here can be any object that implements `Deserialize`,
     /// allowing you to use the state API to store arbitrary objects. Common
-    /// state events, such as `m.room.name`, can be found in ...
-    pub fn get_state<T: Deserialize>(&mut self, ev_type: &str, key: Option<&str>) -> MatrixFuture<T> {
-    }*/
+    /// state events, such as `m.room.name`, can be found in the `content`
+    /// module (`content::room::Name` for `m.room.name`).
+    ///
+    /// If the event was not found, an error will be thrown of type
+    /// `HttpCode(http::StatusCode::NotFound)`.
+    pub fn get_state<T: DeserializeOwned + 'static>(&mut self, ev_type: &str, key: Option<&str>) -> MatrixFuture<T> {
+        MatrixRequest::new_basic(Get, format!("/rooms/{}/state/{}/{}",
+                                              self.room.id,
+                                              ev_type,
+                                              key.unwrap_or("")))
+            .send(self.cli)
+    }
+    /// State events can be sent using this endpoint. These events will be
+    /// overwritten if the <event type> (`ev_type`) and <state key> (`key`) all
+    /// match.
+    ///
+    /// Like `get_state`, the value here can be any object that implements
+    /// `Serialize`, allowing you to use the state API to store arbitrary
+    /// objects. See the `get_state` docs for more.
+    pub fn set_state<T: Serialize>(&mut self, ev_type: &str, key: Option<&str>, val: T) -> MatrixFuture<SetStateReply> {
+        MatrixRequest {
+            meth: Put,
+            endpoint: format!("/rooms/{}/state/{}/{}",
+                              self.room.id,
+                              ev_type, key.unwrap_or("")).into(),
+            params: HashMap::new(),
+            body: val
+        }.send(self.cli)
+    }
     /// Strips all information out of an event which isn't critical to the
     /// integrity of the server-side representation of the room.
     ///
