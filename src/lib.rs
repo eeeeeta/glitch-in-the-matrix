@@ -49,6 +49,10 @@ pub mod http {
     pub use hyper::Body;
     pub use hyper::header::ContentType;
     pub use hyper::StatusCode;
+    pub use hyper::Client;
+    pub use hyper_openssl::HttpsConnector;
+    pub use hyper::client::HttpConnector;
+    pub type MatrixHyper = Client<HttpsConnector<HttpConnector>>;
 }
 pub mod types;
 pub mod room;
@@ -62,7 +66,7 @@ use types::replies::*;
 use types::content::root::types::Presence;
 use hyper::{Method, Body};
 use Method::*;
-use hyper::client::{HttpConnector, Request};
+use hyper::client::Request;
 use hyper_openssl::HttpsConnector;
 use hyper::header::ContentType;
 use serde::de::DeserializeOwned;
@@ -81,7 +85,7 @@ pub type MatrixFuture<T> = Box<Future<Item=T, Error=MatrixError>>;
 
 /// A connection to a Matrix homeserver.
 pub struct MatrixClient {
-    hyper: hyper::Client<HttpsConnector<HttpConnector>>,
+    hyper: http::MatrixHyper,
     access_token: String,
     hdl: Handle,
     user_id: String,
@@ -196,6 +200,10 @@ impl MatrixClient {
         Box::new(self.hyper.request(req)
                  .map_err(|e| e.into())
                  .and_then(UnitaryResponseWrapper::wrap))
+    }
+    /// Get this `MatrixClient`'s underlying `hyper::Client`.
+    pub fn get_hyper(&mut self) -> &mut http::MatrixHyper {
+        &mut self.hyper
     }
 }
 

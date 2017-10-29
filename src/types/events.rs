@@ -3,10 +3,12 @@
 //! For event *content*, see the `content` module.
 use super::content::{Content, deserialize_content};
 use serde::*;
+use errors::*;
 use serde_json::Value;
 use serde::de;
 use room::Room;
 
+/// The `unsigned` field in many event types.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UnsignedData {
     pub age: u64,
@@ -27,7 +29,7 @@ pub struct MetaRedacted {
     #[serde(rename = "room_id")]
     pub room: Option<Room<'static>>,
     pub sender: Option<String>,
-    pub redacted_because: MetaFull
+    pub unsigned: UnsignedData
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -40,6 +42,7 @@ pub struct MetaMinimal {
     pub event_id: Option<String>,
     pub sender: Option<String>,
     pub state_key: Option<String>,
+    pub unsigned: Option<UnsignedData>
 }
 
 /// An event in a room.
@@ -54,47 +57,73 @@ pub struct MetaFull {
     pub origin_server_ts: u64,
     #[serde(rename = "room_id")]
     pub room: Option<Room<'static>>,
-    // can be recursive until we differ between redacted and not redacted events
     pub unsigned: Option<UnsignedData>,
     // state event
     pub state_key: Option<String>,
     pub prev_content: Option<Content>,
     pub prev_sender: Option<String>,
     pub invite_room_state: Option<Vec<MetaMinimal>>,
-    // extra
-    pub age: Option<u64>,
-    pub txn_id: Option<String>,
-    pub redacts: Option<String>,
-    pub membership: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
-pub enum EventMetadata {
+enum EventMetadata {
     Full(MetaFull),
-    Redacted(MetaRedacted),
-    Minimal(MetaMinimal)
+    Minimal(MetaMinimal),
+    Redacted(MetaRedacted)
 }
+/// A Matrix event.
 #[derive(Debug)]
-pub struct Event(pub EventMetadata, pub Content);
+pub enum Event {
+    /// A full event.
+    Full(MetaFull, Content),
+    /// A minimal or ephemeral event.
+    Minimal(MetaMinimal, Content),
+    /// An event that has been redacted.
+    Redacted(MetaRedacted),
+    /// A full event where we couldn't deserialize the event content.
+    FullError(MetaFull, MatrixError),
+    /// A minimal event where we couldn't deserialize the event content.
+    MinimalError(MetaMinimal, MatrixError)
+}
 
+fn parse_event_content(v: &Value) -> MatrixResult<Content> {
+    let typ = v.get("type").ok_or("No event type field")?;
+    let typ = match *typ {
+        Value::String(ref s) => s as &str,
+        _ => Err("Event type is not a string")?
+    };
+    let content = v.get("content").ok_or("No content field")?;
+    let content = deserialize_content(typ, content.clone())?;
+    Ok(content)
+}
 impl<'de> Deserialize<'de> for Event {
     fn deserialize<D>(d: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         let v = Value::deserialize(d)?;
-        let content = {
-            let typ = v.get("type").ok_or(de::Error::custom("No event type field"))?;
-            let typ = match *typ {
-                Value::String(ref s) => s as &str,
-                _ => Err(de::Error::custom("Event type is not a string"))?
-            };
-            let content = v.get("content").ok_or(de::Error::custom("No content field"))?;
-            let content = deserialize_content(typ, content.clone())
-                .map_err(|e| de::Error::custom(e.to_string()))?;
-            content
+        let meta: EventMetadata = if v.pointer("/unsigned/redacted_because").is_some() {
+            EventMetadata::Redacted(::serde_json::from_value(v.clone())
+                                    .map_err(|e| de::Error::custom(e.to_string()))?)
+        }
+        else {
+            ::serde_json::from_value(v.clone())
+                .map_err(|e| de::Error::custom(e.to_string()))?
         };
-        let meta: EventMetadata = ::serde_json::from_value(v)
-            .map_err(|e| de::Error::custom(e.to_string()))?;
-        Ok(Event(meta, content))
+        if let EventMetadata::Redacted(mr) = meta {
+            return Ok(Event::Redacted(mr));
+        }
+        match parse_event_content(&v) {
+            Ok(content) => Ok(match meta {
+                EventMetadata::Full(m) => Event::Full(m, content),
+                EventMetadata::Minimal(m) => Event::Minimal(m, content),
+                _ => unreachable!()
+            }),
+            Err(e) => Ok(match meta {
+                EventMetadata::Full(m) => Event::FullError(m, e),
+                EventMetadata::Minimal(m) => Event::MinimalError(m, e),
+                _ => unreachable!()
+            })
+        }
+
     }
 }
 /// Events in a room.

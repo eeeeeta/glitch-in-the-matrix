@@ -2,7 +2,7 @@ extern crate glitch_in_the_matrix as matrix_api;
 extern crate serde_json;
 
 use matrix_api::types::replies::{SyncReply};
-use matrix_api::types::events::{Event, EventMetadata};
+use matrix_api::types::events::Event;
 
 use std::fs;
 use std::io;
@@ -33,17 +33,21 @@ fn deser_events() {
         let parsed = ::serde_json::from_str::<Event>(&text);
         print!("test deser_events: parsing {:32} ", filename);
         match parsed {
-            Ok(Event(res, _)) => {
+            Ok(ev) => {
                 print!("which is ");
-                match res {
-                    EventMetadata::Minimal(_) => {
+                match ev {
+                    Event::Minimal(..) => {
                         println!("MinimalEvent");
                     },
-                    EventMetadata::Redacted(_) => {
+                    Event::Redacted(..) => {
                         println!("RedactEvent");
                     },
-                    EventMetadata::Full(_) => {
+                    Event::Full(..) => {
                         println!("Event");
+                    },
+                    o => {
+                        failed = true;
+                        println!("Errored event: {:?}", o);
                     }
                 }
             },

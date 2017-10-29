@@ -8,7 +8,7 @@ use tokio_core::reactor::Core;
 use gm::{MatrixClient, MatrixFuture};
 use gm::types::messages::{Message};
 use gm::types::content::{Content};
-use gm::types::events::{EventMetadata, Event};
+use gm::types::events::Event;
 use rpassword::prompt_password_stdout;
 use std::env;
 
@@ -32,8 +32,8 @@ fn main() {
     let fut = ss.skip(1).for_each(|sync| {
         let mut futs: Vec<MatrixFuture<()>> = vec![];
         for (room, events) in sync.rooms.join {
-            for Event(meta, content) in events.timeline.events {
-                if let EventMetadata::Full(meta) = meta {
+            for event in events.timeline.events {
+                if let Event::Full(meta, content) = event {
                     // only echo messages from other users
                     if meta.sender == mx.user_id() {
                         continue;
