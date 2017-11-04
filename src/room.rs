@@ -9,7 +9,6 @@ use serde::de::DeserializeOwned;
 use std::borrow::Cow;
 use futures::*;
 use hyper::Method::*;
-use std::collections::HashMap;
 
 /// A Matrix room. This object is a thin wrapper over a room ID.
 ///
@@ -68,14 +67,13 @@ impl<'a, 'b, 'c> RoomClient<'a, 'b, 'c> {
     /// Sends a message to this room.
     pub fn send(&mut self, msg: Message) -> MatrixFuture<SendReply> {
         self.cli.txnid += 1;
-        MatrixRequest {
-            meth: Put,
-            endpoint: format!("/rooms/{}/send/m.room.message/{}",
-                              self.room.id,
-                              self.cli.txnid).into(),
-            params: HashMap::new(),
-            body: msg
-        }.send(self.cli)
+        MatrixRequest::new_with_body_ser(
+            Put,
+            format!("/rooms/{}/send/m.room.message/{}",
+                    self.room.id,
+                    self.cli.txnid),
+            msg
+        ).send(self.cli)
     }
     /// Wrapper function that sends a `Message::Notice` with the specified unformatted text
     /// to this room. Provided for convenience purposes.
@@ -131,14 +129,13 @@ impl<'a, 'b, 'c> RoomClient<'a, 'b, 'c> {
     /// `Serialize`, allowing you to use the state API to store arbitrary
     /// objects. See the `get_state` docs for more.
     pub fn set_state<T: Serialize>(&mut self, ev_type: &str, key: Option<&str>, val: T) -> MatrixFuture<SetStateReply> {
-        MatrixRequest {
-            meth: Put,
-            endpoint: format!("/rooms/{}/state/{}/{}",
-                              self.room.id,
-                              ev_type, key.unwrap_or("")).into(),
-            params: HashMap::new(),
-            body: val
-        }.send(self.cli)
+        MatrixRequest::new_with_body_ser(
+            Put,
+            format!("/rooms/{}/state/{}/{}",
+                    self.room.id,
+                    ev_type, key.unwrap_or("")),
+            val
+        ).send(self.cli)
     }
     /// Strips all information out of an event which isn't critical to the
     /// integrity of the server-side representation of the room.

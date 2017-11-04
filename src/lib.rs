@@ -70,11 +70,11 @@ use hyper::client::Request;
 use hyper_openssl::HttpsConnector;
 use hyper::header::ContentType;
 use serde::de::DeserializeOwned;
-use std::collections::HashMap;
 use tokio_core::reactor::Handle;
 use futures::*;
 use request::MatrixRequest;
 use sync::SyncStream;
+use std::collections::HashMap;
 
 /// A `Future` with a `MatrixError` error type. Returned by most library
 /// functions.
@@ -133,14 +133,13 @@ impl MatrixClient {
     }
     /// Update our presence status.
     pub fn update_presence(&mut self, p: Presence) -> MatrixFuture<()> {
-        MatrixRequest {
-            meth: Put,
-            endpoint: format!("/presence/{}/status", self.user_id).into(),
-            params: HashMap::new(),
-            body: json!({
+        MatrixRequest::new_with_body_ser(
+            Put,
+            format!("/presence/{}/status", self.user_id),
+            json!({
                 "presence": p
             })
-        }.discarding_send(self)
+        ).discarding_send(self)
     }
     /// Upload some data (convertible to a `Body`) of a given `ContentType`, like an image.
     ///
@@ -154,10 +153,10 @@ impl MatrixClient {
     pub fn upload<T: Into<Body>>(&mut self, data: T, ct: ContentType) -> MatrixFuture<UploadReply> {
         let req = MatrixRequest {
             meth: Post,
-            endpoint: format!("{}/_matrix/media/r0/upload?access_token={}",
-                              self.url, self.access_token).into(),
+            endpoint: "/upload".into(),
             params: HashMap::new(),
-            body: ()
+            body: (),
+            typ: request::apis::r0::MediaApi
         }.make_hyper(self);
         let mut req = match req {
             Ok(r) => r,
