@@ -9,7 +9,7 @@ homepage = "https://github.com/eeeeeta/glitch-in-the-matrix"
 keywords = ["chat", "matrix"]
 license = "CC0-1.0"
 name = "glitch-in-the-matrix"
-readme = "README.md"
+readme = "../README.md"
 repository = "https://github.com/eeeeeta/glitch-in-the-matrix"
 version = "0.11.0"
 
