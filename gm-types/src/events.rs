@@ -3,9 +3,9 @@
 //! For event *content*, see the `content` module.
 use super::content::{Content, deserialize_content};
 use serde::*;
-use errors::*;
 use serde_json::Value;
 use serde::de;
+use serde_json::Error as SerdeError;
 use room::Room;
 
 /// The `unsigned` field in many event types.
@@ -82,18 +82,18 @@ pub enum Event {
     /// An event that has been redacted.
     Redacted(MetaRedacted),
     /// A full event where we couldn't deserialize the event content.
-    FullError(MetaFull, MatrixError),
+    FullError(MetaFull, SerdeError),
     /// A minimal event where we couldn't deserialize the event content.
-    MinimalError(MetaMinimal, MatrixError)
+    MinimalError(MetaMinimal, SerdeError)
 }
 
-fn parse_event_content(v: &Value) -> MatrixResult<Content> {
-    let typ = v.get("type").ok_or("No event type field")?;
+fn parse_event_content(v: &Value) -> Result<Content, SerdeError> {
+    let typ = v.get("type").ok_or(de::Error::custom("No event type field"))?;
     let typ = match *typ {
         Value::String(ref s) => s as &str,
-        _ => Err("Event type is not a string")?
+        _ => Err(de::Error::custom("Event type is not a string"))?
     };
-    let content = v.get("content").ok_or("No content field")?;
+    let content = v.get("content").ok_or(de::Error::custom("No content field"))?;
     let content = deserialize_content(typ, content.clone())?;
     Ok(content)
 }

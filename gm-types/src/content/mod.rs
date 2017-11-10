@@ -8,7 +8,10 @@
 //! type, modulo case conversion. That is, `m.room.join_rules` would be found in
 //! `content::room::JoinRules`.
 use serde_json::Value;
-use errors::*;
+use serde_json::Error as SerdeError;
+
+#[cfg(feature="gitm_deny_unknown")]
+use serde::de;
 
 pub mod room;
 pub mod root;
@@ -62,12 +65,12 @@ macro_rules! matchy_matchy {
             #[cfg(not(feature="gitm_deny_unknown"))]
             _ => Content::Unknown($val),
             #[cfg(feature="gitm_deny_unknown")]
-            x => bail!("Unknown content type {}", $in)
+            x => de::Error::custom(format!("Unknown content type {}", $in))?
         }
     }
 }
 /// Deserialize a JSON `Value` of given event type into some event `Content`.
-pub fn deserialize_content(typ: &str, val: Value) -> MatrixResult<Content> {
+pub fn deserialize_content(typ: &str, val: Value) -> Result<Content, SerdeError> {
     let res = matchy_matchy! {
         typ, val,
         "m.room.aliases", RoomAliases,

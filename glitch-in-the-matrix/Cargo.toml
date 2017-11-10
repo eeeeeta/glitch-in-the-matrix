@@ -1,0 +1,31 @@
+[package]
+authors = [
+    "eeeeeta <eeeeeta@users.noreply.github.com>",
+    "digital <coding@digitalville.de>"
+]
+description = "A set of matrix.org bindings for Rust."
+documentation = "http://docs.rs/glitch-in-the-matrix"
+homepage = "https://github.com/eeeeeta/glitch-in-the-matrix"
+keywords = ["chat", "matrix"]
+license = "CC0-1.0"
+name = "glitch-in-the-matrix"
+readme = "README.md"
+repository = "https://github.com/eeeeeta/glitch-in-the-matrix"
+version = "0.11.0"
+
+[dependencies]
+error-chain = "0.10"
+futures = "0.1.14"
+hyper = "0.11"
+hyper-openssl = "0.3"
+serde = "1.0"
+serde_json = "1.0"
+tokio-core = "0.1"
+percent-encoding = "1.0"
+gm-types = { path = "../gm-types", version = "0.1" }
+[dev-dependencies]
+rpassword = "0.4.2"
+
+[features]
+gitm_deny_unknown = []
+gitm_show_responses = []

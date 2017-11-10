@@ -1,33 +1,34 @@
-//! Abstraction for Matrix rooms.
+//! Abstractions for Matrix rooms.
 
 use types::replies::*;
 use types::messages::Message;
 use super::{MatrixClient, MatrixFuture};
 use request::MatrixRequest;
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use serde::Serialize;
 use serde::de::DeserializeOwned;
-use std::borrow::Cow;
 use futures::*;
 use hyper::Method::*;
 
-/// A Matrix room. This object is a thin wrapper over a room ID.
+pub use types::room::Room;
+
+/// Trait used to implement methods on `Room`.
 ///
-/// It's probably best to read the `RoomClient` documentation as well - after
-/// all, that's how you do anything with this room.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
-pub struct Room<'a> {
-    pub id: Cow<'a, str>
-}
-impl<'a> Serialize for Room<'a> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        serializer.serialize_str(&self.id)
-    }
-}
-impl<'de> Deserialize<'de> for Room<'static> {
-    fn deserialize<D>(de: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
-        let id: String = Deserialize::deserialize(de)?;
-        Ok(Room { id: id.into() })
-    }
+/// This exists because `Room` is defined in another crate (`gm-types`), which
+/// has no knowledge of `MatrixClient`. It contains most of the interesting
+/// methods for `Room` - most notably, you can make a `RoomClient`, which is how
+/// you actually do anything room-related.
+pub trait RoomExt<'a> {
+    /// Requests that the server resolve a room alias to a room (ID).
+    ///
+    /// The server will use the federation API to resolve the alias if the
+    /// domain part of the alias does not correspond to the server's own domain.
+    fn from_alias(cli: &mut MatrixClient, alias: &str) -> MatrixFuture<Self>;
+    /// Use a `MatrixClient` to make a `RoomClient`, an object used to call
+    /// endpoints relating to rooms.
+    ///
+    /// If you want to do pretty much anything *with* this `Room`, you probably
+    /// want to call this at some point.
+    fn cli<'b, 'c>(&'b self, cli: &'c mut MatrixClient) -> RoomClient<'b, 'a, 'c>;
 }
 /// A `Room` with a `MatrixClient`, which you can use to call endpoints relating
 /// to rooms.
@@ -35,28 +36,13 @@ pub struct RoomClient<'a, 'b: 'a, 'c> {
     pub room: &'a Room<'b>,
     pub cli: &'c mut MatrixClient
 }
-impl<'a> Room<'a> {
-    /// Requests that the server resolve a room alias to a room (ID).
-    ///
-    /// The server will use the federation API to resolve the alias if the
-    /// domain part of the alias does not correspond to the server's own domain.
-    pub fn from_alias(cli: &mut MatrixClient, alias: &str) -> MatrixFuture<Self> {
+impl<'a> RoomExt<'a> for Room<'a> {
+    fn from_alias(cli: &mut MatrixClient, alias: &str) -> MatrixFuture<Self> {
         Box::new(MatrixRequest::new_basic(Get, format!("/directory/room/{}", alias))
                  .send(cli)
                  .map(|RoomAliasReply { room, .. }| room))
     }
-    /// Make a `Room` object from a room ID.
-    pub fn from_id<T: Into<Cow<'a, str>>>(id: T) -> Self {
-        Room {
-            id: id.into()
-        }
-    }
-    /// Use a `MatrixClient` to make a `RoomClient`, an object used to call
-    /// endpoints relating to rooms.
-    ///
-    /// If you want to do pretty much anything *with* this `Room`, you probably
-    /// want to call this at some point.
-    pub fn cli<'b, 'c>(&'b self, cli: &'c mut MatrixClient) -> RoomClient<'b, 'a, 'c> {
+    fn cli<'b, 'c>(&'b self, cli: &'c mut MatrixClient) -> RoomClient<'b, 'a, 'c> {
         RoomClient {
             room: self,
             cli

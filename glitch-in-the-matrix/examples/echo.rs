@@ -6,6 +6,7 @@ extern crate rpassword;
 use futures::{Future, Stream};
 use tokio_core::reactor::Core;
 use gm::{MatrixClient, MatrixFuture};
+use gm::room::RoomExt;
 use gm::types::messages::{Message};
 use gm::types::content::{Content};
 use gm::types::events::Event;

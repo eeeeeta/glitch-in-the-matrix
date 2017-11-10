@@ -1,0 +1,10 @@
+[package]
+authors = ["eeeeeta <eeeeeta@users.noreply.github.com>"]
+name = "gm-types"
+version = "0.1.0"
+
+[dependencies]
+error-chain = "0.11.0"
+serde = "1.0.19"
+serde_derive = "1.0.19"
+serde_json = "1.0.6"

@@ -1,7 +1,7 @@
 //! Replies obtained from calling various API endpoints.
 use std::collections::HashMap;
 use room::Room;
-use ::types::events::{Events};
+use events::Events;
 
 /// Information about a room's events.
 #[derive(Deserialize, Debug)]

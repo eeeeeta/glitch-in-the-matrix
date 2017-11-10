@@ -2,13 +2,15 @@
 //! It has a number of limitations at present, and is not recommended for production use. Still,
 //! it is provided in the hope that it might be useful.
 //!
+//! This crate re-exports a subcrate, `gm-types`, which contains most of the API
+//! types used for deserialization - mostly to reduce compile times.
+//!
 //! See the `examples/` subdirectory for a simple echo client example.
 //!
 //! Licensed under CC0.
 
 
 extern crate serde;
-#[macro_use] extern crate serde_derive;
 #[macro_use] extern crate serde_json;
 extern crate hyper;
 extern crate hyper_openssl;
@@ -16,6 +18,7 @@ extern crate hyper_openssl;
 extern crate tokio_core;
 #[macro_use] extern crate futures;
 extern crate percent_encoding;
+pub extern crate gm_types as types;
 
 pub mod errors {
     #![allow(unused_doc_comment)]
@@ -54,7 +57,6 @@ pub mod http {
     pub use hyper::client::HttpConnector;
     pub type MatrixHyper = Client<HttpsConnector<HttpConnector>>;
 }
-pub mod types;
 pub mod room;
 pub mod request;
 pub mod sync;

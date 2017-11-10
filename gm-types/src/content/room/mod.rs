@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 pub mod types;
-use types::messages;
+use messages;
 
 fn tru() -> bool {
     true
