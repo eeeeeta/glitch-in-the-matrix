@@ -2,6 +2,12 @@
 authors = ["eeeeeta <eeeeeta@users.noreply.github.com>"]
 name = "gm-types"
 version = "0.1.0"
+description = "Types for the glitch-in-the-matrix crate."
+documentation = "http://docs.rs/gm-types"
+homepage = "https://github.com/eeeeeta/glitch-in-the-matrix"
+keywords = ["chat", "matrix"]
+license = "CC0-1.0"
+repository = "https://github.com/eeeeeta/glitch-in-the-matrix"
 
 [dependencies]
 error-chain = "0.11.0"
