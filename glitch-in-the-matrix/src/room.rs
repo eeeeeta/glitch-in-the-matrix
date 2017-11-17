@@ -2,11 +2,13 @@
 
 use types::replies::*;
 use types::messages::Message;
+use types::content::room::PowerLevels;
 use super::{MatrixClient, MatrixFuture};
 use request::MatrixRequest;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use futures::*;
+use errors::*;
 use hyper::Method::*;
 
 pub use types::room::Room;
@@ -246,5 +248,28 @@ impl<'a, 'b, 'c> RoomClient<'a, 'b, 'c> {
         MatrixRequest::new_with_body(Post, format!("/rooms/{}/invite", self.room.id),
                                      vec![("user_id", user_id)])
             .discarding_send(self.cli)
+    }
+    /// Get a user's power level, falling back on the default value for the room
+    /// if not present.
+    ///
+    /// The `user_id` is a `String` here, not a `&str`, because it is stored in
+    /// a future that outlives this function.
+    pub fn get_user_power_level(&mut self, user_id: String) -> MatrixFuture<u32> {
+        let fut = self.get_state::<PowerLevels>("m.room.power_levels", None);
+        Box::new(fut.map(move |x| {
+            if let Some(pl) = x.users.get(&user_id) {
+                *pl
+            }
+            else {
+                x.users_default
+            }
+        }).or_else(|e| {
+            if let &MatrixErrorKind::BadRequest(ref brk) = e.kind() {
+                if brk.errcode == "M_NOT_FOUND" {
+                    return Ok(0)
+                }
+            }
+            Err(e)
+        }))
     }
 }
