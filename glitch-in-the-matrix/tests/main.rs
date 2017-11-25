@@ -1,7 +1,7 @@
 extern crate glitch_in_the_matrix as matrix_api;
 extern crate serde_json;
 
-use matrix_api::types::replies::{SyncReply};
+use matrix_api::types::sync::SyncReply;
 use matrix_api::types::events::Event;
 
 use std::fs;

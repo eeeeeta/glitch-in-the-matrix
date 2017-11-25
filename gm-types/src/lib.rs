@@ -12,3 +12,4 @@ pub mod messages;
 pub mod content;
 pub mod events;
 pub mod replies;
+pub mod sync;

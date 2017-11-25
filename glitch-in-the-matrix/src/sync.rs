@@ -4,7 +4,7 @@ use hyper;
 use hyper::Method::*;
 use hyper::client::{HttpConnector, Request};
 use hyper_openssl::HttpsConnector;
-use types::replies::*;
+use types::sync::*;
 use super::MatrixFuture;
 use util::ResponseWrapper;
 use futures::*;

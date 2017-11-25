@@ -32,20 +32,18 @@ fn main() {
     // new requests.
     let fut = ss.skip(1).for_each(|sync| {
         let mut futs: Vec<MatrixFuture<()>> = vec![];
-        for (room, events) in sync.rooms.join {
-            for event in events.timeline.events {
-                if let Event::Full(meta, content) = event {
-                    // only echo messages from other users
-                    if meta.sender == mx.user_id() {
-                        continue;
-                    }
-                    // tell the server we have read the event
-                    let mut rc = room.cli(&mut mx);
-                    futs.push(Box::new(rc.read_receipt(&meta.event_id).map(|_| ())));
-                    if let Content::RoomMessage(m) = content {
-                        if let Message::Text { body, .. } = m {
-                            futs.push(Box::new(rc.send_simple(body).map(|_| ())));
-                        }
+        for (room, evt) in sync.iter_events() {
+            if let Event::Full(ref meta, ref content) = *evt {
+                // only echo messages from other users
+                if meta.sender == mx.user_id() {
+                    continue;
+                }
+                // tell the server we have read the event
+                let mut rc = room.cli(&mut mx);
+                futs.push(Box::new(rc.read_receipt(&meta.event_id).map(|_| ())));
+                if let Content::RoomMessage(ref m) = *content {
+                    if let Message::Text { ref body, .. } = *m {
+                        futs.push(Box::new(rc.send_simple(body.to_owned()).map(|_| ())));
                     }
                 }
             }

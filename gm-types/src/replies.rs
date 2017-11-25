@@ -1,32 +1,6 @@
 //! Replies obtained from calling various API endpoints.
-use std::collections::HashMap;
 use room::Room;
-use events::Events;
 
-/// Information about a room's events.
-#[derive(Deserialize, Debug)]
-pub struct RoomEvents {
-    #[serde(default)]
-    pub state: Events,
-    #[serde(default)]
-    pub timeline: Events,
-}
-/// The `rooms` component of a `SyncReply`.
-#[derive(Deserialize, Debug)]
-pub struct SyncRooms {
-    #[serde(default)]
-    pub join: HashMap<Room<'static>, RoomEvents>,
-    #[serde(default)]
-    pub invite: HashMap<Room<'static>, RoomEvents>,
-    #[serde(default)]
-    pub leave: HashMap<Room<'static>, RoomEvents>
-}
-/// The reply obtained from `sync()`.
-#[derive(Deserialize, Debug)]
-pub struct SyncReply {
-    pub next_batch: String,
-    pub rooms: SyncRooms
-}
 /// The reply obtained from `/send`.
 #[derive(Deserialize, Debug)]
 pub struct SendReply {
