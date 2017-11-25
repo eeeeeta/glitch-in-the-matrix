@@ -27,7 +27,7 @@ fn zero() -> u32 {
 /// by this event should be considered simply as advice on which aliases might
 /// exist, for which the client can perform the lookup to confirm whether it
 /// receives the correct room ID.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Aliases {
     /// A list of room aliases.
     pub aliases: Vec<String>
@@ -37,7 +37,7 @@ pub struct Aliases {
 /// This event is used to inform the room about which alias should be considered
 /// the canonical one. This could be for display purposes or as suggestion to
 /// users which alias to use to advertise the room.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CanonicalAlias {
     pub alias: String
 }
@@ -45,7 +45,7 @@ pub struct CanonicalAlias {
 ///
 /// This is the first event in a room and cannot be changed. It acts as the root
 /// of all other events.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Create {
     /// The user_id of the room creator. This is set by the homeserver.
     pub creator: String,
@@ -61,7 +61,7 @@ pub struct Create {
 /// join the room must first receive an invite to the room from someone already
 /// inside of the room. Currently, knock and private are reserved keywords which
 /// are not implemented.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct JoinRules {
     /// The type of rules used for users wishing to join this room.
     pub join_rule: types::JoinRule
@@ -79,7 +79,7 @@ pub struct JoinRules {
 /// The third_party_invite property will be set if this invite is an invite
 /// event and is the successor of an m.room.third_party_invite event, and absent
 /// otherwise.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Member {
     ///	The avatar URL for this user, if any. This is added by the homeserver.
     #[serde(default)]
@@ -120,7 +120,7 @@ pub struct Member {
 /// kick, ban, and redact, respectively. Each of these levels defaults to 50 if
 /// they are not specified in the m.room.power_levels event, or if the room
 /// contains no m.room.power_levels event.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PowerLevels {
     /// The level required to ban a user. Defaults to 50 if unspecified.
     #[serde(default = "fifty")]
@@ -166,7 +166,7 @@ pub struct PowerLevels {
 /// message event, which can be undone, but cannot be applied to state events.
 /// The event that has been redacted is specified in the `redacts` event level
 /// key.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Redaction {
     ///	The reason for the redaction, if any.
     #[serde(default)]
@@ -188,7 +188,7 @@ pub type Message = messages::Message;
 ///
 /// An event of this type is automatically created when creating a room using
 /// /createRoom with the name key.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Name {
     /// The name of the room. This MUST NOT exceed 255 bytes.
     pub name: String
@@ -197,7 +197,7 @@ pub struct Name {
 ///
 /// A picture that is associated with the room. This can be displayed alongside
 /// the room information.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Avatar {
     /// Metadata about the image referred to in `url`.
     #[serde(default)]
@@ -211,7 +211,7 @@ pub struct Avatar {
 /// the room. It can also be used as a way to display extra information about
 /// the room, which may not be suitable for the room name. The room topic can
 /// also be set when creating a room using /createRoom with the topic key.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Topic {
     /// The topic text.
     pub topic: String
@@ -220,7 +220,7 @@ pub struct Topic {
 ///
 /// This event controls whether a user can see the events that happened in a
 /// room from before they joined.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct HistoryVisibility {
     /// Who can see the room history.
     pub history_visibility: types::HistoryVisibility
@@ -230,7 +230,7 @@ pub struct HistoryVisibility {
 /// This event controls whether guest users are allowed to join rooms. If this
 /// event is absent, servers should act as if it is present and has the
 /// guest_access value "forbidden".
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GuestAccess {
     /// Whether guests can join the room.
     pub guest_access: types::GuestAccess

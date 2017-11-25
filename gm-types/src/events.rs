@@ -9,7 +9,7 @@ use serde_json::Error as SerdeError;
 use room::Room;
 
 /// The `unsigned` field in many event types.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct UnsignedData {
     pub age: u64,
     pub prev_content: Option<Content>,
@@ -18,7 +18,7 @@ pub struct UnsignedData {
     pub redacted_because: Option<::serde_json::Value>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 /// Metadata for a redacted event.
 pub struct MetaRedacted {
     #[serde(rename="type")]
@@ -32,7 +32,7 @@ pub struct MetaRedacted {
     pub unsigned: UnsignedData
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 /// Metadata for an ephemeral event (like m.typing).
 pub struct MetaMinimal {
     #[serde(rename = "type")]
@@ -46,7 +46,7 @@ pub struct MetaMinimal {
 }
 
 /// An event in a room.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MetaFull {
     // event
     #[serde(rename="type")]
@@ -65,7 +65,7 @@ pub struct MetaFull {
     pub invite_room_state: Option<Vec<MetaMinimal>>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(untagged)]
 enum EventMetadata {
     Full(MetaFull),

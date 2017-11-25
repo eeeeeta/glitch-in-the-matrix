@@ -4,7 +4,7 @@ pub mod types;
 /// `m.call.invite`
 ///
 /// This event is sent by the caller when they wish to establish a call.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Invite {
     /// A unique identifer for the call.
     call_id: String,
@@ -22,7 +22,7 @@ pub struct Invite {
 /// This event is sent by callers after sending an invite and by the callee
 /// after answering. Its purpose is to give the other party additional ICE
 /// candidates to try using to communicate.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Candidates {
     /// The ID of the call this event relates to.
     call_id: String,
@@ -34,7 +34,7 @@ pub struct Candidates {
 /// `m.call.answer`
 ///
 /// This event is sent by the callee when they wish to answer the call.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Answer {
     /// The ID of the call this event relates to.
     call_id: String,
@@ -49,7 +49,7 @@ pub struct Answer {
 /// Sent by either party to signal their termination of the call. This can be
 /// sent either once the call has has been established or before to abort the
 /// call.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Hangup {
     /// The ID of the call this event relates to.
     call_id: String,

@@ -1,5 +1,5 @@
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Offer {
     /// The type of session description. Must be 'offer'.
     #[serde(rename = "type")]
@@ -8,7 +8,7 @@ pub struct Offer {
     sdp: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Candidate {
     /// The SDP media type this candidate is intended for.
     #[serde(rename = "sdpMid")]
@@ -20,7 +20,7 @@ pub struct Candidate {
     candidate: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Answer {
     /// The type of session description. Must be 'answer'.
     #[serde(rename = "type")]

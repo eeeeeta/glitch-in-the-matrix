@@ -1,4 +1,4 @@
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all="snake_case")]
 /// Defines who can join a room
 pub enum JoinRule {
@@ -8,7 +8,7 @@ pub enum JoinRule {
     // Knock,
     // Private,
 }
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all="snake_case")]
 /// Possible membership states of a user
 pub enum Membership {
@@ -29,7 +29,7 @@ pub enum Membership {
     // Knock,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all="snake_case")]
 /// Who can see the room history
 pub enum HistoryVisibility {
@@ -38,7 +38,7 @@ pub enum HistoryVisibility {
     Shared,
     WorldReadable,
 }
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all="snake_case")]
 /// Whether guests can join a room
 pub enum GuestAccess {

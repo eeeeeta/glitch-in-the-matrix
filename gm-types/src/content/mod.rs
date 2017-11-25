@@ -17,13 +17,13 @@ pub mod room;
 pub mod root;
 pub mod call;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PublicKey {
     pub public_key: String,
     pub key_validity_url: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(untagged)]
 /// The content of an event.
 pub enum Content {

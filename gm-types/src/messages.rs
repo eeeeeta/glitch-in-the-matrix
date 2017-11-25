@@ -1,7 +1,7 @@
 //! Values for the `m.room.message` event's content.
 
 /// Information about an image.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ImageInfo {
     /// The height of the image in pixels.
     pub h: u32,
@@ -14,7 +14,7 @@ pub struct ImageInfo {
 }
 
 /// Information about a file.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct FileInfo {
     /// MIME type
     pub mimetype: String,
@@ -22,7 +22,7 @@ pub struct FileInfo {
     pub size: u32
 }
 /// Information about an audio clip.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AudioInfo {
     ///	The duration of the audio in milliseconds.
     pub duration: u32,
@@ -31,7 +31,7 @@ pub struct AudioInfo {
     /// The size of the audio clip in bytes.
     pub size: u32
 }
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct VideoInfo {
     /// The duration of the video in milliseconds.
     pub duration: u32,
@@ -48,7 +48,7 @@ pub struct VideoInfo {
     /// Metadata about the image referred to in thumbnail_url.
     pub thumbnail_info: ImageInfo
 }
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag="msgtype")]
 /// A message sent to a room.
 pub enum Message {

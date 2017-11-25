@@ -1,0 +1,18 @@
+[package]
+authors = ["eeeeeta <eeeeeta@users.noreply.github.com>"]
+name = "gm-boilerplate"
+description = "Some boilerplate-reducing bits for the glitch-in-the-matrix crate."
+documentation = "http://docs.rs/gm-boilerplate"
+homepage = "https://github.com/eeeeeta/glitch-in-the-matrix"
+keywords = ["chat", "matrix"]
+license = "CC0-1.0"
+repository = "https://github.com/eeeeeta/glitch-in-the-matrix"
+version = "0.1.0"
+
+[dependencies]
+futures = "0.1"
+tokio-core = "0.1"
+
+[dependencies.glitch-in-the-matrix]
+path = "../glitch-in-the-matrix"
+version = "0.13"
