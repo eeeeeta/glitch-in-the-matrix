@@ -11,7 +11,7 @@ license = "CC0-1.0"
 name = "glitch-in-the-matrix"
 readme = "../README.md"
 repository = "https://github.com/eeeeeta/glitch-in-the-matrix"
-version = "0.13.0"
+version = "0.13.1"
 
 [dependencies]
 error-chain = "0.10"
@@ -22,7 +22,7 @@ serde = "1.0"
 serde_json = "1.0"
 tokio-core = "0.1"
 percent-encoding = "1.0"
-gm-types = { path = "../gm-types", version = "0.3" }
+gm-types = { path = "../gm-types", version = "0.3.1" }
 
 [dev-dependencies]
 rpassword = "0.4.2"

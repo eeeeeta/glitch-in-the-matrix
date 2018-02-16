@@ -125,6 +125,34 @@ impl<'a, 'b, 'c> RoomClient<'a, 'b, 'c> {
             val
         ).send(self.cli)
     }
+    /// This API returns a list of message and state events for a room. It uses
+    /// pagination query parameters to paginate history in the room.
+    ///
+    /// ## Parameters
+    ///
+    /// - `from`: The token to start returning events from. This token can be
+    ///   obtained from a `prev_batch` token returned for each room by the sync
+    ///   API, or from a `start` or `end` token returned by a previous request to
+    ///   this endpoint.
+    /// - `to`: The token to stop returning events at. This token can be
+    ///   obtained from a prev_batch token returned for each room by the sync
+    ///   endpoint, or from a start or end token returned by a previous request to
+    ///   this endpoint.
+    /// - `backward`: Whether to paginate backward, or forward; true = back-pagination.
+    /// - `limit`: The maximum number of events to return. (default: 10)
+    pub fn messages(&mut self, from: &str, to: Option<&str>, backward: bool, limit: Option<u32>) -> MatrixFuture<MessagesReply> {
+        let mut req = MatrixRequest::new_basic(Get, format!("/rooms/{}/messages", self.room.id));
+        req.params.insert("from".into(), from.into());
+        if let Some(to) = to {
+            req.params.insert("to".into(), to.into());
+        }
+        let dir = if backward { "b" } else { "f" };
+        req.params.insert("dir".into(), dir.into());
+        if let Some(limit) = limit {
+            req.params.insert("limit".into(), limit.to_string().into());
+        }
+        req.send(self.cli)
+    }
     /// Strips all information out of an event which isn't critical to the
     /// integrity of the server-side representation of the room.
     ///

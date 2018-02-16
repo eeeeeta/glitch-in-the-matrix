@@ -138,6 +138,10 @@ impl<'a, T, U> MatrixRequest<'a, T, U> where T: Serialize, U: ApiType {
     pub fn make_hyper(&self, client: &MatrixClient) -> MatrixResult<Request> {
         let body = self.body()?;
         let mut params = format!("access_token={}", client.access_token);
+        if client.is_as {
+            params += &format!("&user_id={}",
+                              utf8_percent_encode(&client.user_id, DEFAULT_ENCODE_SET));
+        }
         for (k, v) in self.params.iter() {
             params += &format!("&{}={}",
                               utf8_percent_encode(k.as_ref(), DEFAULT_ENCODE_SET),

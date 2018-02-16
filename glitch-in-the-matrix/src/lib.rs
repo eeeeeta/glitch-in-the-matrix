@@ -92,9 +92,41 @@ pub struct MatrixClient {
     hdl: Handle,
     user_id: String,
     url: String,
+    is_as: bool,
     txnid: u32
 }
 impl MatrixClient {
+    pub fn as_register_user(&mut self, user_id: String) -> MatrixFuture<()> {
+        let uri: hyper::Uri = match format!("{}/_matrix/client/r0/register?access_token={}", self.url, self.access_token).parse() {
+            Ok(u) => u,
+            Err(e) => return Box::new(futures::future::err(e.into()))
+        };
+        let mut req = Request::new(Post, uri);
+        req.set_body(json!({
+            "type": "m.login.application_service",
+            "user": user_id
+        }).to_string());
+        self.send_discarding_request(req)
+    }
+    pub fn new_appservice(url: String, user_id: String, as_token: String, hdl: &Handle) -> MatrixResult<Self> {
+        let conn = HttpsConnector::new(4, hdl)?;
+        let client = hyper::Client::configure()
+            .connector(conn)
+            .build(hdl);
+        let hdl = hdl.clone();
+        Ok(MatrixClient {
+            hyper: client,
+            access_token: as_token,
+            user_id: user_id,
+            url: url,
+            hdl: hdl,
+            is_as: true,
+            txnid: 0
+        })
+    }
+    pub fn alter_user_id(&mut self, user_id: String) {
+        self.user_id = user_id;
+    }
     /// Log in to a Matrix homeserver, and return a client object.
     pub fn login(username: &str, password: &str, url: &str, hdl: &Handle) -> MatrixFuture<Self> {
         let conn = match HttpsConnector::new(4, hdl) {
@@ -124,9 +156,25 @@ impl MatrixClient {
                 user_id: rpl.user_id,
                 url: url,
                 hdl: hdl,
+                is_as: false,
                 txnid: 0
             }
         }))
+    }
+    pub fn create_room(&mut self, opts: RoomCreationOptions) -> MatrixFuture<JoinReply> {
+        MatrixRequest::new_with_body_ser(Post, "/createRoom", opts)
+            .send(self)
+    }
+    pub fn get_displayname(&mut self, user_id: &str) -> MatrixFuture<DisplaynameReply> {
+        MatrixRequest::new_basic(Get, format!("/profile/{}/displayname", user_id))
+            .send(self)
+    }
+    pub fn set_displayname(&mut self, name: String) -> MatrixFuture<()> {
+        MatrixRequest::new_with_body_ser(
+            Put,
+            format!("/profile/{}/displayname", self.user_id),
+            DisplaynameReply { displayname: name }
+        ).discarding_send(self)
     }
     /// Join a room by identifier or alias.
     pub fn join(&mut self, roomid: &str) -> MatrixFuture<JoinReply> {
@@ -167,6 +215,14 @@ impl MatrixClient {
         req.set_body(data.into());
         req.headers_mut().set(ct);
         self.send_request(req)
+    }
+    /// Requests that the server resolve a room alias to a room ID.
+    ///
+    /// The server will use the federation API to resolve the alias if the
+    /// domain part of the alias does not correspond to the server's own domain.
+    pub fn resolve_room_id(&mut self, rid: &str) -> MatrixFuture<RoomIdReply> {
+        MatrixRequest::new_basic(Get, format!("/directory/room/{}", rid))
+            .send(self)
     }
     /// Get the client's MXID.
     pub fn user_id(&self) -> &str {

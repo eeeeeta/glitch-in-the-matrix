@@ -1,5 +1,8 @@
 //! Replies obtained from calling various API endpoints.
 use room::Room;
+use events::Event;
+use std::collections::HashMap;
+use serde_json::Value;
 
 /// The reply obtained from `/send`.
 #[derive(Deserialize, Clone, Debug)]
@@ -31,6 +34,11 @@ pub struct RoomAliasReply {
     pub room: Room<'static>,
     pub servers: Vec<String>
 }
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct DisplaynameReply {
+    /// A unique identifier for the event.
+    pub displayname: String
+}
 /// The reply obtained when calling `Room::set_state`.
 #[derive(Deserialize, Clone, Debug)]
 pub struct SetStateReply {
@@ -38,8 +46,61 @@ pub struct SetStateReply {
     pub event_id: String
 }
 /// The reply obtained when something's gone wrong.
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct BadRequestReply {
     pub errcode: String,
-    pub error: String
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>
+}
+/// The reply obtained from `Room::messages`.
+#[derive(Deserialize, Debug)]
+pub struct MessagesReply {
+    /// The token the pagination starts from.
+    ///
+    /// If back-paginating, this will be the token supplied in `from`.
+    pub start: String,
+    /// The token the pagination ends at.
+    ///
+    /// If back-paginating, use this to request earlier events.
+    pub end: String,
+    /// A list of room events.
+    pub chunk: Vec<Event>
+}
+#[derive(Deserialize, Clone, Debug)]
+pub struct RoomIdReply {
+    /// The room ID for this room alias.
+    pub room_id: String,
+    /// A list of servers that are aware of this room alias.
+    pub servers: Vec<String>
+}
+#[derive(Serialize, Copy, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RoomVisibility {
+    Public,
+    Private
+}
+#[derive(Serialize, Copy, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RoomPreset {
+    PrivateChat,
+    TrustedPrivateChat,
+    PublicChat
+}
+#[derive(Serialize, Clone, Debug, Default)]
+pub struct RoomCreationOptions {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub visibility: Option<RoomVisibility>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub room_alias_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub topic: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub invite: Vec<String>,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    pub creation_content: HashMap<String, Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preset: Option<RoomPreset>,
+    pub is_direct: bool
 }
