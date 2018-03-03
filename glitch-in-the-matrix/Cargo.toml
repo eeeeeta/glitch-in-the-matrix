@@ -14,7 +14,8 @@ repository = "https://github.com/eeeeeta/glitch-in-the-matrix"
 version = "0.13.1"
 
 [dependencies]
-error-chain = "0.10"
+failure = "0.1"
+failure_derive = "0.1"
 futures = "0.1"
 hyper = "0.11"
 hyper-openssl = "0.3"

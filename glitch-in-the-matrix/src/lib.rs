@@ -14,37 +14,50 @@ extern crate serde;
 #[macro_use] extern crate serde_json;
 extern crate hyper;
 extern crate hyper_openssl;
-#[macro_use] extern crate error_chain;
+extern crate failure;
+#[macro_use] extern crate failure_derive;
 extern crate tokio_core;
 #[macro_use] extern crate futures;
 extern crate percent_encoding;
 pub extern crate gm_types as types;
 
 pub mod errors {
-    #![allow(unused_doc_comment)]
-    //! Error handling, using `error_chain`.
-    //!
-    //! The `StatusCode` enum is re-exported in the `http` module.
-    error_chain! {
-        types {
-            MatrixError, MatrixErrorKind, ResultExt, MatrixResult;
-        }
-        foreign_links {
-            Hyper(::hyper::error::Error);
-            Serde(::serde_json::Error);
-            UriError(::hyper::error::UriError);
-            Io(::std::io::Error);
-            Openssl(::hyper_openssl::openssl::error::ErrorStack);
-        }
-        errors {
-            HttpCode(c: ::hyper::StatusCode) {
-                display("HTTP error: {}", c.canonical_reason().unwrap_or("unknown"))
+    macro_rules! derive_from {
+        ($err:ident, $($var:ident, $ty:ty),*) => {
+            $(
+            impl From<$ty> for $err {
+                fn from(e: $ty) -> $err {
+                    $err::$var(e)
+                }
             }
-            BadRequest(e: super::types::replies::BadRequestReply) {
-                display("Bad request: {:?}", e)
-            }
+            )*
         }
     }
+    #[derive(Fail, Debug)]
+    pub enum MatrixError {
+        #[fail(display = "HTTP error: {}", _0)]
+        Hyper(#[cause] ::hyper::error::Error),
+        #[fail(display = "Serialization error: {}", _0)]
+        Serde(#[cause] ::serde_json::Error),
+        #[fail(display = "Error decoding URI: {}", _0)]
+        UriError(#[cause] ::hyper::error::UriError),
+        #[fail(display = "I/O error: {}", _0)]
+        Io(#[cause] ::std::io::Error),
+        #[fail(display = "OpenSSL error: {}", _0)]
+        Openssl(#[cause] ::hyper_openssl::openssl::error::ErrorStack),
+        #[fail(display = "Request failed with HTTP status: {}", _0)]
+        HttpCode(::hyper::StatusCode),
+        #[fail(display = "Error from homeserver: {:?}", _0)]
+        BadRequest(super::types::replies::BadRequestReply)
+    }
+    derive_from!(MatrixError,
+                 Hyper, ::hyper::error::Error,
+                 Serde, ::serde_json::Error,
+                 UriError, ::hyper::error::UriError,
+                 Io, ::std::io::Error,
+                 Openssl, ::hyper_openssl::openssl::error::ErrorStack
+    );
+    pub type MatrixResult<T> = Result<T, MatrixError>;
 }
 pub mod http {
     //! Types reexported from `hyper`.

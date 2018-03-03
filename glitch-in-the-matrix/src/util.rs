@@ -1,7 +1,6 @@
 //! Utility wrappers used internally.
 
 use errors::*;
-use errors::MatrixErrorKind::*;
 use types::replies::*;
 use hyper::{Body, StatusCode};
 use hyper::client::Response;
@@ -29,10 +28,10 @@ impl<T: DeserializeOwned> ResponseWrapper<T> {
         let resp = try_ready!(self.inner.poll());
         if !self.sc.is_success() {
             if let Ok(e) = ::serde_json::from_slice::<BadRequestReply>(&resp) {
-                bail!(BadRequest(e));
+                return Err(MatrixError::BadRequest(e));
             }
             else {
-                bail!(HttpCode(self.sc.clone()));
+                return Err(MatrixError::HttpCode(self.sc.clone()));
             }
         }
         Ok(Async::Ready(resp))

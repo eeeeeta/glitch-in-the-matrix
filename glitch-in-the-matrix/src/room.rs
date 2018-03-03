@@ -292,7 +292,7 @@ impl<'a, 'b, 'c> RoomClient<'a, 'b, 'c> {
                 x.users_default
             }
         }).or_else(|e| {
-            if let &MatrixErrorKind::BadRequest(ref brk) = e.kind() {
+            if let MatrixError::BadRequest(ref brk) = e {
                 if brk.errcode == "M_NOT_FOUND" {
                     return Ok(0)
                 }
