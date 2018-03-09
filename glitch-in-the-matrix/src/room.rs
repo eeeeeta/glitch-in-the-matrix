@@ -2,6 +2,7 @@
 
 use types::replies::*;
 use types::messages::Message;
+use types::events::Event;
 use types::content::room::PowerLevels;
 use super::{MatrixClient, MatrixFuture};
 use request::MatrixRequest;
@@ -102,7 +103,7 @@ impl<'a, 'b, 'c> RoomClient<'a, 'b, 'c> {
     ///
     /// If the event was not found, an error will be thrown of type
     /// `HttpCode(http::StatusCode::NotFound)`.
-    pub fn get_state<T: DeserializeOwned + 'static>(&mut self, ev_type: &str, key: Option<&str>) -> MatrixFuture<T> {
+    pub fn get_typed_state<T: DeserializeOwned + 'static>(&mut self, ev_type: &str, key: Option<&str>) -> MatrixFuture<T> {
         MatrixRequest::new_basic(Get, format!("/rooms/{}/state/{}/{}",
                                               self.room.id,
                                               ev_type,
@@ -116,7 +117,7 @@ impl<'a, 'b, 'c> RoomClient<'a, 'b, 'c> {
     /// Like `get_state`, the value here can be any object that implements
     /// `Serialize`, allowing you to use the state API to store arbitrary
     /// objects. See the `get_state` docs for more.
-    pub fn set_state<T: Serialize>(&mut self, ev_type: &str, key: Option<&str>, val: T) -> MatrixFuture<SetStateReply> {
+    pub fn set_typed_state<T: Serialize>(&mut self, ev_type: &str, key: Option<&str>, val: T) -> MatrixFuture<SetStateReply> {
         MatrixRequest::new_with_body_ser(
             Put,
             format!("/rooms/{}/state/{}/{}",
@@ -124,6 +125,36 @@ impl<'a, 'b, 'c> RoomClient<'a, 'b, 'c> {
                     ev_type, key.unwrap_or("")),
             val
         ).send(self.cli)
+    }
+    /// Get the state events for the current state of a room.
+    pub fn get_all_state(&mut self) -> MatrixFuture<Vec<Event>> {
+        MatrixRequest::new_basic(Get, format!("/rooms/{}/state", self.room.id))
+            .send(self.cli)
+    }
+    /// Get a single event for this room, based on `event_id`.
+    ///
+    /// You must have permission to retrieve this event (e.g. by being a member of the room for
+    /// this event)
+    pub fn get_event(&mut self, id: &str) -> MatrixFuture<Event> {
+        MatrixRequest::new_basic(Get, format!("/rooms/{}/event/{}", self.room.id, id))
+            .send(self.cli)
+    }
+    /// Get the list of member events for this room.
+    pub fn get_members(&mut self) -> MatrixFuture<ChunkReply> {
+        MatrixRequest::new_basic(Get, format!("/rooms/{}/members", self.room.id))
+            .send(self.cli)
+    }
+    /// Get the list of joined members in this room.
+    ///
+    /// The current user must be in the room for it to work, unless it is an
+    /// Application Service, in which case any of the AS's users must be in the room.
+    ///
+    /// This API is primarily for Application Services and should be faster to
+    /// respond than `get_members()`, as it can be implemented more efficiently
+    /// on the server.
+    pub fn get_joined_members(&mut self) -> MatrixFuture<JoinedMembersReply> {
+        MatrixRequest::new_basic(Get, format!("/rooms/{}/joined_members", self.room.id))
+            .send(self.cli)
     }
     /// This API returns a list of message and state events for a room. It uses
     /// pagination query parameters to paginate history in the room.
@@ -140,7 +171,7 @@ impl<'a, 'b, 'c> RoomClient<'a, 'b, 'c> {
     ///   this endpoint.
     /// - `backward`: Whether to paginate backward, or forward; true = back-pagination.
     /// - `limit`: The maximum number of events to return. (default: 10)
-    pub fn messages(&mut self, from: &str, to: Option<&str>, backward: bool, limit: Option<u32>) -> MatrixFuture<MessagesReply> {
+    pub fn get_messages(&mut self, from: &str, to: Option<&str>, backward: bool, limit: Option<u32>) -> MatrixFuture<MessagesReply> {
         let mut req = MatrixRequest::new_basic(Get, format!("/rooms/{}/messages", self.room.id));
         req.params.insert("from".into(), from.into());
         if let Some(to) = to {
@@ -283,7 +314,7 @@ impl<'a, 'b, 'c> RoomClient<'a, 'b, 'c> {
     /// The `user_id` is a `String` here, not a `&str`, because it is stored in
     /// a future that outlives this function.
     pub fn get_user_power_level(&mut self, user_id: String) -> MatrixFuture<u32> {
-        let fut = self.get_state::<PowerLevels>("m.room.power_levels", None);
+        let fut = self.get_typed_state::<PowerLevels>("m.room.power_levels", None);
         Box::new(fut.map(move |x| {
             if let Some(pl) = x.users.get(&user_id) {
                 *pl

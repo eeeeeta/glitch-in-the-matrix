@@ -3,6 +3,7 @@ use room::Room;
 use events::Event;
 use std::collections::HashMap;
 use serde_json::Value;
+use content::room::Member;
 
 /// The reply obtained from `/send`.
 #[derive(Deserialize, Clone, Debug)]
@@ -65,6 +66,15 @@ pub struct MessagesReply {
     pub end: String,
     /// A list of room events.
     pub chunk: Vec<Event>
+}
+#[derive(Deserialize, Debug)]
+pub struct ChunkReply {
+    pub chunk: Vec<Event>
+}
+#[derive(Deserialize, Debug)]
+pub struct JoinedMembersReply {
+    /// A map of MXID to room member objects.
+    pub joined: HashMap<String, Member>
 }
 #[derive(Deserialize, Clone, Debug)]
 pub struct RoomIdReply {

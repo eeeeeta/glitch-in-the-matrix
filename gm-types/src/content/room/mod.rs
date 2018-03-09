@@ -88,6 +88,7 @@ pub struct Member {
     #[serde(default)]
     pub displayname: Option<String>,
     /// The membership state of the user.
+    #[serde(default)]
     pub membership: types::Membership,
     /// Flag indicating if the room containing this event was created with the
     /// intention of being a direct chat.

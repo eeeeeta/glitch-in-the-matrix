@@ -28,6 +28,11 @@ pub enum Membership {
     // reserved word
     // Knock,
 }
+impl Default for Membership {
+    fn default() -> Self {
+        Membership::Join
+    }
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all="snake_case")]
