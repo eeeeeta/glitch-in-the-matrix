@@ -5,11 +5,13 @@ extern crate rpassword;
 
 use futures::{Future, Stream};
 use tokio_core::reactor::Core;
-use gm::{MatrixClient, MatrixFuture};
+use gm::MatrixClient;
 use gm::room::RoomExt;
 use gm::types::messages::{Message};
 use gm::types::content::{Content};
 use gm::types::events::Event;
+use gm::sync::SyncStream;
+use gm::request::MatrixRequestable;
 use rpassword::prompt_password_stdout;
 use std::env;
 
@@ -27,28 +29,27 @@ fn main() {
     let hdl = core.handle();
     let mut mx = core.run(MatrixClient::login(username, password, server, &hdl)).unwrap();
     println!("[+] Connected to {} as {}", server, username);
-    let ss = mx.get_sync_stream();
+    let ss = SyncStream::new(mx.clone());
     // We discard the results of the initial `/sync`, because we only want to echo
     // new requests.
     let fut = ss.skip(1).for_each(|sync| {
-        let mut futs: Vec<MatrixFuture<()>> = vec![];
         for (room, evt) in sync.iter_events() {
             if let Event::Full(ref meta, ref content) = *evt {
                 // only echo messages from other users
-                if meta.sender == mx.user_id() {
+                if meta.sender == mx.get_user_id() {
                     continue;
                 }
                 // tell the server we have read the event
                 let mut rc = room.cli(&mut mx);
-                futs.push(Box::new(rc.read_receipt(&meta.event_id).map(|_| ())));
+                hdl.spawn(rc.read_receipt(&meta.event_id).map(|_| ()).map_err(|_| ()));
                 if let Content::RoomMessage(ref m) = *content {
                     if let Message::Text { ref body, .. } = *m {
-                        futs.push(Box::new(rc.send_simple(body.to_owned()).map(|_| ())));
+                        hdl.spawn(rc.send_simple(body.to_owned()).map(|_| ()).map_err(|_| ()));
                     }
                 }
             }
         }
-        futures::future::join_all(futs.into_iter()).map(|_| ())
+        Ok(())
     });
     core.run(fut).unwrap();
 }

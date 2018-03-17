@@ -4,8 +4,8 @@ use types::replies::*;
 use types::messages::Message;
 use types::events::Event;
 use types::content::room::PowerLevels;
-use super::{MatrixClient, MatrixFuture};
-use request::MatrixRequest;
+use super::MatrixFuture;
+use request::{MatrixRequestable, MatrixRequest};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use futures::*;
@@ -25,42 +25,55 @@ pub trait RoomExt<'a> {
     ///
     /// The server will use the federation API to resolve the alias if the
     /// domain part of the alias does not correspond to the server's own domain.
-    fn from_alias(cli: &mut MatrixClient, alias: &str) -> MatrixFuture<Self>;
+    fn from_alias<R: MatrixRequestable>(cli: &mut R, alias: &str) -> MatrixFuture<Self>;
+    /// Joins a room by identifier or alias.
+    fn join<R: MatrixRequestable>(cli: &mut R, room: &str) -> MatrixFuture<Self>;
+    /// Creates a room, with given options.
+    fn create<R: MatrixRequestable>(cli: &mut R, opts: RoomCreationOptions) -> MatrixFuture<Self>;
     /// Use a `MatrixClient` to make a `RoomClient`, an object used to call
     /// endpoints relating to rooms.
     ///
     /// If you want to do pretty much anything *with* this `Room`, you probably
     /// want to call this at some point.
-    fn cli<'b, 'c>(&'b self, cli: &'c mut MatrixClient) -> RoomClient<'b, 'a, 'c>;
+    fn cli<'b, 'c, T>(&'b self, cli: &'c mut T) -> RoomClient<'b, 'a, 'c, T> where T: MatrixRequestable;
 }
 /// A `Room` with a `MatrixClient`, which you can use to call endpoints relating
 /// to rooms.
-pub struct RoomClient<'a, 'b: 'a, 'c> {
+pub struct RoomClient<'a, 'b: 'a, 'c, T: 'c> {
     pub room: &'a Room<'b>,
-    pub cli: &'c mut MatrixClient
+    pub cli: &'c mut T
 }
 impl<'a> RoomExt<'a> for Room<'a> {
-    fn from_alias(cli: &mut MatrixClient, alias: &str) -> MatrixFuture<Self> {
+    fn from_alias<R: MatrixRequestable>(cli: &mut R, alias: &str) -> MatrixFuture<Self> {
         Box::new(MatrixRequest::new_basic(Get, format!("/directory/room/{}", alias))
                  .send(cli)
                  .map(|RoomAliasReply { room, .. }| room))
     }
-    fn cli<'b, 'c>(&'b self, cli: &'c mut MatrixClient) -> RoomClient<'b, 'a, 'c> {
+    fn join<R: MatrixRequestable>(cli: &mut R, room: &str) -> MatrixFuture<Self> {
+        Box::new(MatrixRequest::new_basic(Post, format!("/join/{}", room))
+                 .send(cli)
+                 .map(|JoinReply { room }| room))
+    }
+    fn create<R: MatrixRequestable>(cli: &mut R, opts: RoomCreationOptions) -> MatrixFuture<Self> {
+        Box::new(MatrixRequest::new_with_body_ser(Post, "/createRoom", opts)
+                 .send(cli)
+                 .map(|JoinReply { room }| room))
+    }
+    fn cli<'b, 'c, T>(&'b self, cli: &'c mut T) -> RoomClient<'b, 'a, 'c, T> where T: MatrixRequestable {
         RoomClient {
             room: self,
             cli
         }
     }
 }
-impl<'a, 'b, 'c> RoomClient<'a, 'b, 'c> {
+impl<'a, 'b, 'c, R> RoomClient<'a, 'b, 'c, R> where R: MatrixRequestable {
     /// Sends a message to this room.
     pub fn send(&mut self, msg: Message) -> MatrixFuture<SendReply> {
-        self.cli.txnid += 1;
         MatrixRequest::new_with_body_ser(
             Put,
             format!("/rooms/{}/send/m.room.message/{}",
                     self.room.id,
-                    self.cli.txnid),
+                    self.cli.get_txnid()),
             msg
         ).send(self.cli)
     }
@@ -193,11 +206,10 @@ impl<'a, 'b, 'c> RoomClient<'a, 'b, 'c> {
     /// greater than or equal to the redact power level of the room may redact
     /// events there.
     pub fn redact(&mut self, eventid: &str, reason: Option<&str>) -> MatrixFuture<()> {
-        self.cli.txnid += 1;
         let mut body = vec![];
         body.extend(reason.map(|x| ("reason", x)));
         MatrixRequest::new_with_body(Post, format!("/rooms/{}/redact/{}/{}",
-                                                   self.room.id, eventid, self.cli.txnid),
+                                                   self.room.id, eventid, self.cli.get_txnid()),
                                      body)
             .discarding_send(self.cli)
     }
@@ -206,11 +218,10 @@ impl<'a, 'b, 'c> RoomClient<'a, 'b, 'c> {
     /// Alternatively, if typing is false, it tells the server that the user has
     /// stopped typing.
     pub fn typing(&mut self, typing: bool, timeout: Option<usize>) -> MatrixFuture<()> {
-        self.cli.txnid += 1;
         let mut body = vec![("typing", typing.to_string())];
         body.extend(timeout.map(|x| ("timeout", x.to_string())));
         MatrixRequest::new_with_body(Post, format!("/rooms/{}/typing/{}",
-                                                   self.room.id, self.cli.user_id),
+                                                   self.room.id, self.cli.get_user_id()),
                                      body)
             .discarding_send(self.cli)
 

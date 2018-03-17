@@ -1,12 +1,11 @@
 //! Utilities for using the long-polling `/sync` API.
 
-use hyper;
 use hyper::Method::*;
-use hyper::client::{HttpConnector, Request};
-use hyper_openssl::HttpsConnector;
 use types::sync::*;
+use std::collections::HashMap;
 use super::MatrixFuture;
-use util::ResponseWrapper;
+use request::{MatrixRequest, MatrixRequestable};
+use request::apis::r0::ClientApi;
 use futures::*;
 use errors::*;
 
@@ -15,16 +14,23 @@ use errors::*;
 /// This calls the long-polling `/sync` API, which will wait until replies come
 /// in and send them to the client. If you want to reduce the wait time, use the
 /// `set_timeout()` function.
-pub struct SyncStream {
-    pub(crate) hyper: hyper::Client<HttpsConnector<HttpConnector>>,
+pub struct SyncStream<R> {
+    pub(crate) rq: R,
     pub(crate) last_batch: Option<String>,
     pub(crate) set_presence: bool,
-    pub(crate) access_token: String,
-    pub(crate) url: String,
     pub(crate) timeout: u64,
     pub(crate) cur_req: Option<MatrixFuture<SyncReply>>
 }
-impl SyncStream {
+impl<R> SyncStream<R> where R: MatrixRequestable {
+    pub fn new(rq: R) -> Self {
+        SyncStream {
+            rq,
+            last_batch: None,
+            set_presence: true,
+            timeout: 30_000,
+            cur_req: None
+        }
+    }
     /// Set whether polling the `/sync` API marks us as online.
     pub fn set_sync_sets_presence(&mut self, v: bool) {
         self.set_presence = v;
@@ -50,24 +56,26 @@ impl SyncStream {
     pub fn set_timeout(&mut self, timeout: u64) {
         self.timeout = timeout;
     }
-    fn req(&mut self) -> Request {
-        let mut params = vec![];
-        params.push(format!("set_presence={}", if self.set_presence {
+    fn req(&mut self) -> MatrixRequest<'static, ()> {
+        let mut params = HashMap::new();
+        params.insert("set_presence".into(), if self.set_presence {
             "online"
-        } else { "offline" }));
+        } else { "offline" }.to_string().into());
         if let Some(ref b) = self.last_batch {
-            params.push(format!("since={}", b));
-            params.push(format!("timeout={}", self.timeout));
+            params.insert("since".into(), b.to_string().into());
+            params.insert("timeout".into(), self.timeout.to_string().into());
         }
-        Request::new(Get, format!("{}/_matrix/client/r0/sync?access_token={}&{}",
-                                  self.url,
-                                  &self.access_token,
-                                  params.join("&")
-        ).parse().unwrap())
+        MatrixRequest {
+            meth: Get,
+            endpoint: "/sync".into(),
+            params,
+            body: (),
+            typ: ClientApi
+        }
     }
 }
 
-impl Stream for SyncStream {
+impl<R> Stream for SyncStream<R> where R: MatrixRequestable {
     type Item = SyncReply;
     type Error = MatrixError;
 
@@ -89,9 +97,7 @@ impl Stream for SyncStream {
                 }
             }
             let req = self.req();
-            self.cur_req = Some(Box::new(self.hyper.request(req)
-                                         .map_err(|e| e.into())
-                                         .and_then(ResponseWrapper::<SyncReply>::wrap)))
+            self.cur_req = Some(req.send(&mut self.rq));
         }
     }
 }

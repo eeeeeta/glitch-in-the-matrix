@@ -19,77 +19,34 @@ extern crate failure;
 extern crate tokio_core;
 #[macro_use] extern crate futures;
 extern crate percent_encoding;
+extern crate uuid;
 pub extern crate gm_types as types;
 
-pub mod errors {
-    macro_rules! derive_from {
-        ($err:ident, $($var:ident, $ty:ty),*) => {
-            $(
-            impl From<$ty> for $err {
-                fn from(e: $ty) -> $err {
-                    $err::$var(e)
-                }
-            }
-            )*
-        }
-    }
-    #[derive(Fail, Debug)]
-    pub enum MatrixError {
-        #[fail(display = "HTTP error: {}", _0)]
-        Hyper(#[cause] ::hyper::error::Error),
-        #[fail(display = "Serialization error: {}", _0)]
-        Serde(#[cause] ::serde_json::Error),
-        #[fail(display = "Error decoding URI: {}", _0)]
-        UriError(#[cause] ::hyper::error::UriError),
-        #[fail(display = "I/O error: {}", _0)]
-        Io(#[cause] ::std::io::Error),
-        #[fail(display = "OpenSSL error: {}", _0)]
-        Openssl(#[cause] ::hyper_openssl::openssl::error::ErrorStack),
-        #[fail(display = "Request failed with HTTP status: {}", _0)]
-        HttpCode(::hyper::StatusCode),
-        #[fail(display = "Error from homeserver: {:?}", _0)]
-        BadRequest(super::types::replies::BadRequestReply)
-    }
-    derive_from!(MatrixError,
-                 Hyper, ::hyper::error::Error,
-                 Serde, ::serde_json::Error,
-                 UriError, ::hyper::error::UriError,
-                 Io, ::std::io::Error,
-                 Openssl, ::hyper_openssl::openssl::error::ErrorStack
-    );
-    pub type MatrixResult<T> = Result<T, MatrixError>;
-}
-pub mod http {
-    //! Types reexported from `hyper`.
-    pub use hyper::Method;
-    pub use hyper::Body;
-    pub use hyper::header::ContentType;
-    pub use hyper::StatusCode;
-    pub use hyper::Client;
-    pub use hyper_openssl::HttpsConnector;
-    pub use hyper::client::HttpConnector;
-    pub type MatrixHyper = Client<HttpsConnector<HttpConnector>>;
-}
+pub mod errors;
+pub mod http;
 pub mod room;
 pub mod request;
 pub mod sync;
+pub mod profile;
+pub mod media;
+pub mod presence;
 mod util;
 
 use util::*;
 use errors::*;
 use types::replies::*;
-use types::content::root::types::Presence;
-use hyper::{Method, Body};
+use hyper::Method;
 use Method::*;
 use hyper::client::Request;
 use hyper_openssl::HttpsConnector;
-use hyper::header::ContentType;
 use serde::de::DeserializeOwned;
 use tokio_core::reactor::Handle;
 use futures::*;
-use request::MatrixRequest;
-use sync::SyncStream;
-use std::collections::HashMap;
+use request::{MatrixRequestable, MatrixRequest};
+use std::borrow::Cow;
+use std::rc::Rc;
+use std::cell::RefCell;
+use uuid::Uuid;
 
 /// A `Future` with a `MatrixError` error type. Returned by most library
 /// functions.
@@ -99,14 +56,14 @@ use std::collections::HashMap;
 pub type MatrixFuture<T> = Box<Future<Item=T, Error=MatrixError>>;
 
 /// A connection to a Matrix homeserver.
+#[derive(Clone)]
 pub struct MatrixClient {
     hyper: http::MatrixHyper,
     access_token: String,
     hdl: Handle,
     user_id: String,
     url: String,
-    is_as: bool,
-    txnid: u32
+    is_as: bool
 }
 impl MatrixClient {
     pub fn as_register_user(&mut self, user_id: String) -> MatrixFuture<()> {
@@ -134,7 +91,6 @@ impl MatrixClient {
             url: url,
             hdl: hdl,
             is_as: true,
-            txnid: 0
         })
     }
     pub fn alter_user_id(&mut self, user_id: String) {
@@ -170,113 +126,67 @@ impl MatrixClient {
                 url: url,
                 hdl: hdl,
                 is_as: false,
-                txnid: 0
             }
         }))
     }
-    pub fn create_room(&mut self, opts: RoomCreationOptions) -> MatrixFuture<JoinReply> {
-        MatrixRequest::new_with_body_ser(Post, "/createRoom", opts)
-            .send(self)
+}
+impl MatrixRequestable for Rc<RefCell<MatrixClient>> {
+    type Txnid = Uuid;
+    fn get_url(&self) -> Cow<str> {
+        self.borrow().url.clone().into()
     }
-    pub fn get_displayname(&mut self, user_id: &str) -> MatrixFuture<DisplaynameReply> {
-        MatrixRequest::new_basic(Get, format!("/profile/{}/displayname", user_id))
-            .send(self)
+    fn get_access_token(&self) -> Cow<str> {
+        self.borrow().access_token.clone().into()
     }
-    pub fn set_displayname(&mut self, name: String) -> MatrixFuture<()> {
-        MatrixRequest::new_with_body_ser(
-            Put,
-            format!("/profile/{}/displayname", self.user_id),
-            DisplaynameReply { displayname: name }
-        ).discarding_send(self)
+    fn get_txnid(&mut self) -> Uuid {
+        Uuid::new_v4()
     }
-    /// Join a room by identifier or alias.
-    pub fn join(&mut self, roomid: &str) -> MatrixFuture<JoinReply> {
-        MatrixRequest::new_basic(Post, format!("/join/{}", roomid))
-            .send(self)
+    fn get_user_id(&self) -> Cow<str> {
+        self.borrow().user_id.clone().into()
     }
-    /// Update our presence status.
-    pub fn update_presence(&mut self, p: Presence) -> MatrixFuture<()> {
-        MatrixRequest::new_with_body_ser(
-            Put,
-            format!("/presence/{}/status", self.user_id),
-            json!({
-                "presence": p
-            })
-        ).discarding_send(self)
+    fn is_as(&self) -> bool {
+        self.borrow().is_as
     }
-    /// Upload some data (convertible to a `Body`) of a given `ContentType`, like an image.
-    ///
-    /// `Body` is accessible via the `http` module. See the documentation there
-    /// for a complete reference of what implements `Into<Body>` - a quick
-    /// shortlist: `Vec<u8>`, `&'static [u8]` (not `&'a [u8]`, sadly), `String`,
-    /// `&'static str`.
-    ///
-    /// `ContentType` is accessible via the `http` module. See the documentation
-    /// there for more information on how to use it.
-    pub fn upload<T: Into<Body>>(&mut self, data: T, ct: ContentType) -> MatrixFuture<UploadReply> {
-        let req = MatrixRequest {
-            meth: Post,
-            endpoint: "/upload".into(),
-            params: HashMap::new(),
-            body: (),
-            typ: request::apis::r0::MediaApi
-        }.make_hyper(self);
-        let mut req = match req {
-            Ok(r) => r,
-            Err(e) => return Box::new(futures::future::err(e.into()))
-        };
-        req.set_body(data.into());
-        req.headers_mut().set(ct);
-        self.send_request(req)
+    fn send_request<T>(&mut self, req: Request) -> MatrixFuture<T> where T: DeserializeOwned + 'static {
+        Box::new(self.borrow_mut().hyper.request(req)
+                 .map_err(|e| e.into())
+                 .and_then(ResponseWrapper::<T>::wrap))
     }
-    /// Requests that the server resolve a room alias to a room ID.
-    ///
-    /// The server will use the federation API to resolve the alias if the
-    /// domain part of the alias does not correspond to the server's own domain.
-    pub fn resolve_room_id(&mut self, rid: &str) -> MatrixFuture<RoomIdReply> {
-        MatrixRequest::new_basic(Get, format!("/directory/room/{}", rid))
-            .send(self)
+    fn send_discarding_request(&mut self, req: Request) -> MatrixFuture<()> {
+        Box::new(self.borrow_mut().hyper.request(req)
+                 .map_err(|e| e.into())
+                 .and_then(UnitaryResponseWrapper::wrap))
     }
-    /// Get the client's MXID.
-    pub fn user_id(&self) -> &str {
-        &self.user_id
+}
+impl MatrixRequestable for MatrixClient {
+    type Txnid = Uuid;
+
+    fn get_url(&self) -> Cow<str> {
+        (&self.url as &str).into()
     }
-    /// Get a `SyncStream`, a `Stream` used to obtain replies to the `/sync`
-    /// API.
-    ///
-    /// This `SyncStream` is independent from the original `MatrixClient`, and
-    /// does not borrow from it in any way.
-    pub fn get_sync_stream(&self) -> SyncStream {
-        SyncStream {
-            hyper: self.hyper.clone(),
-            last_batch: None,
-            set_presence: true,
-            access_token: self.access_token.clone(),
-            url: self.url.clone(),
-            timeout: 30000,
-            cur_req: None
-        }
+    fn get_access_token(&self) -> Cow<str> {
+        (&self.access_token as &str).into()
     }
-    /// Sends an arbitrary `Request` to the Matrix homeserver, like one
-    /// generated by `get_request_for()`.
-    pub fn send_request<T>(&mut self, req: Request) -> MatrixFuture<T> where T: DeserializeOwned + 'static {
+    fn get_txnid(&mut self) -> Uuid {
+        Uuid::new_v4()
+    }
+    fn get_user_id(&self) -> Cow<str> {
+        (&self.user_id as &str).into()
+    }
+    fn is_as(&self) -> bool {
+        self.is_as
+    }
+    fn send_request<T>(&mut self, req: Request) -> MatrixFuture<T> where T: DeserializeOwned + 'static {
         Box::new(self.hyper.request(req)
                  .map_err(|e| e.into())
                  .and_then(ResponseWrapper::<T>::wrap))
     }
-    /// Like `send_request()`, but discards the return value that the Matrix
-    /// homeserver sends back.
-    pub fn send_discarding_request(&mut self, req: Request) -> MatrixFuture<()> {
+    fn send_discarding_request(&mut self, req: Request) -> MatrixFuture<()> {
         Box::new(self.hyper.request(req)
                  .map_err(|e| e.into())
                  .and_then(UnitaryResponseWrapper::wrap))
     }
-    /// Get this `MatrixClient`'s underlying `hyper::Client`.
-    pub fn get_hyper(&mut self) -> &mut http::MatrixHyper {
-        &mut self.hyper
-    }
 }
-
 impl Drop for MatrixClient {
     /// Invalidates our access token, so we don't have millions of devices.
     /// Also sets us as offline.
