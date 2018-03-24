@@ -79,8 +79,8 @@ impl<'de> Deserialize<'de> for Event {
         };
         let c = v.get("content").ok_or(de::Error::custom("No content field"))?;
         let content = deserialize_content(typ, c.clone());
-        let room_data: Option<RoomEventData> = ::serde_json::from_value(c.clone()).ok();
-        let state_data: Option<StateEventData> = ::serde_json::from_value(c.clone()).ok();
+        let room_data: Option<RoomEventData> = ::serde_json::from_value(v.clone()).ok();
+        let state_data: Option<StateEventData> = ::serde_json::from_value(v.clone()).ok();
         Ok(Event {
             event_type: typ.into(),
             content,
