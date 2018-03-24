@@ -9,6 +9,7 @@ use hyper::Body;
 use hyper::header::ContentType;
 use types::replies::UploadReply;
 
+/// Contains media repository endpoints.
 pub struct Media;
 
 impl Media {

@@ -3,6 +3,8 @@
 //! Will be better documented in the future; for now,
 //! refer to the official API docs for info on what fields mean.
 
+#![deny(missing_docs)]
+
 extern crate serde;
 #[macro_use] extern crate serde_derive;
 extern crate serde_json;

@@ -7,25 +7,20 @@
 //! The name of a `struct` in this module (and submodules) mirrors its event
 //! type, modulo case conversion. That is, `m.room.join_rules` would be found in
 //! `content::room::JoinRules`.
+#![allow(missing_docs)]
 use serde_json::Value;
-use serde_json::Error as SerdeError;
-
-#[cfg(feature="gitm_deny_unknown")]
-use serde::de;
 
 pub mod room;
 pub mod root;
 pub mod call;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct PublicKey {
-    pub public_key: String,
-    pub key_validity_url: Option<String>,
-}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(untagged)]
+#[allow(missing_docs)]
 /// The content of an event.
+///
+/// NB: This crate's API does *not* guarantee exhaustive matching on this enum.
 pub enum Content {
     RoomAliases(room::Aliases),
     RoomAvatar(room::Avatar),
@@ -49,8 +44,9 @@ pub enum Content {
     CallCandidates(call::Candidates),
     CallAnswer(call::Answer),
     CallHangup(call::Hangup),
-    #[cfg(not(feature="gitm_deny_unknown"))]
     Unknown(::serde_json::Value),
+    #[doc(hidden)]
+    __Nonexhaustive
 }
 // Generates a `match` expression to map event types to the correct content enum
 // variant.
@@ -60,18 +56,22 @@ macro_rules! matchy_matchy {
     ($in:ident, $val:ident, $($a:pat, $t:ident),*) => {
         match $in {
             $(
-                $a => Content::$t(::serde_json::from_value($val)?),
+                $a => {
+                    if let Ok(val) = ::serde_json::from_value($val.clone()) {
+                        Content::$t(val)
+                    }
+                    else {
+                        Content::Unknown($val)
+                    }
+                },
             )*
-            #[cfg(not(feature="gitm_deny_unknown"))]
             _ => Content::Unknown($val),
-            #[cfg(feature="gitm_deny_unknown")]
-            x => de::Error::custom(format!("Unknown content type {}", $in))?
         }
     }
 }
 /// Deserialize a JSON `Value` of given event type into some event `Content`.
-pub fn deserialize_content(typ: &str, val: Value) -> Result<Content, SerdeError> {
-    let res = matchy_matchy! {
+pub fn deserialize_content(typ: &str, val: Value) -> Content {
+    matchy_matchy! {
         typ, val,
         "m.room.aliases", RoomAliases,
         "m.room.avatar", RoomAvatar,
@@ -95,6 +95,5 @@ pub fn deserialize_content(typ: &str, val: Value) -> Result<Content, SerdeError>
         "m.call.candidates", CallCandidates,
         "m.call.answer", CallAnswer,
         "m.call.hangup", CallHangup
-    };
-    Ok(res)
+    }
 }

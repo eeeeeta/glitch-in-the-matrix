@@ -30,17 +30,19 @@ pub trait RoomExt<'a> {
     fn join<R: MatrixRequestable>(cli: &mut R, room: &str) -> MatrixFuture<Self>;
     /// Creates a room, with given options.
     fn create<R: MatrixRequestable>(cli: &mut R, opts: RoomCreationOptions) -> MatrixFuture<Self>;
-    /// Use a `MatrixClient` to make a `RoomClient`, an object used to call
+    /// Use an implementor of `MatrixRequestable` to make a `RoomClient`, an object used to call
     /// endpoints relating to rooms.
     ///
     /// If you want to do pretty much anything *with* this `Room`, you probably
     /// want to call this at some point.
     fn cli<'b, 'c, T>(&'b self, cli: &'c mut T) -> RoomClient<'b, 'a, 'c, T> where T: MatrixRequestable;
 }
-/// A `Room` with a `MatrixClient`, which you can use to call endpoints relating
+/// A `Room` with a `MatrixRequestable` type, which you can use to call endpoints relating
 /// to rooms.
 pub struct RoomClient<'a, 'b: 'a, 'c, T: 'c> {
+    /// A reference to a room.
     pub room: &'a Room<'b>,
+    /// A reference to a `MatrixRequestable` type.
     pub cli: &'c mut T
 }
 impl<'a> RoomExt<'a> for Room<'a> {

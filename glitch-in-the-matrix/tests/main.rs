@@ -34,26 +34,17 @@ fn deser_events() {
         print!("test deser_events: parsing {:32} ", filename);
         match parsed {
             Ok(ev) => {
-                print!("which is ");
-                match ev {
-                    Event::Minimal(..) => {
-                        println!("MinimalEvent");
-                    },
-                    Event::Redacted(..) => {
-                        println!("RedactEvent");
-                    },
-                    Event::Full(..) => {
-                        println!("Event");
-                    },
-                    o => {
-                        failed = true;
-                        println!("Errored event: {:?}", o);
-                    }
+                if ev.room_data.is_some() {
+                    print!("[room] ");
                 }
+                if ev.state_data.is_some() {
+                    print!("[state] ");
+                }
+                println!("...done");
             },
             Err(error) => {
                 failed = true;
-                println!("Error {}",error);
+                println!("...failed: {}", error);
             }
         }
     }

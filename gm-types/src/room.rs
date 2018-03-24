@@ -8,6 +8,7 @@ use std::borrow::Cow;
 /// on `RoomExt`, or are part of the `RoomClient` struct in the main crate.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Room<'a> {
+    #[allow(missing_docs)]
     pub id: Cow<'a, str>
 }
 impl<'a> Serialize for Room<'a> {

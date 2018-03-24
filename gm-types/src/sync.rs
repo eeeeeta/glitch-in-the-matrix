@@ -101,6 +101,7 @@ pub struct SyncReply {
     pub presence: Events
 }
 impl SyncReply {
+    /// Iterate over events in this reply.
     pub fn iter_events(&self) -> SyncEventIter {
         let mut rooms = vec![];
         for (id, room) in self.rooms.join.iter() {
@@ -109,6 +110,7 @@ impl SyncReply {
         SyncEventIter { rooms }
     }
 }
+/// Iterator over events in a `/sync` reply.
 pub struct SyncEventIter<'a> {
     rooms: Vec<(&'a Room<'static>, slice::Iter<'a, Event>)>
 }

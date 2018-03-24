@@ -9,6 +9,7 @@
 //!
 //! Licensed under CC0.
 
+#![deny(missing_docs)]
 
 extern crate serde;
 #[macro_use] extern crate serde_json;
@@ -55,7 +56,7 @@ use uuid::Uuid;
 /// for `impl Trait` to arrive to save us from this madness.
 pub type MatrixFuture<T> = Box<Future<Item=T, Error=MatrixError>>;
 
-/// A connection to a Matrix homeserver.
+/// A connection to a Matrix homeserver, using the `hyper` crate.
 #[derive(Clone)]
 pub struct MatrixClient {
     hyper: http::MatrixHyper,
@@ -66,38 +67,15 @@ pub struct MatrixClient {
     is_as: bool
 }
 impl MatrixClient {
-    pub fn as_register_user(&mut self, user_id: String) -> MatrixFuture<()> {
-        let uri: hyper::Uri = match format!("{}/_matrix/client/r0/register?access_token={}", self.url, self.access_token).parse() {
-            Ok(u) => u,
-            Err(e) => return Box::new(futures::future::err(e.into()))
-        };
-        let mut req = Request::new(Post, uri);
-        req.set_body(json!({
-            "type": "m.login.application_service",
-            "user": user_id
-        }).to_string());
-        self.send_discarding_request(req)
-    }
-    pub fn new_appservice(url: String, user_id: String, as_token: String, hdl: &Handle) -> MatrixResult<Self> {
-        let conn = HttpsConnector::new(4, hdl)?;
-        let client = hyper::Client::configure()
-            .connector(conn)
-            .build(hdl);
-        let hdl = hdl.clone();
-        Ok(MatrixClient {
-            hyper: client,
-            access_token: as_token,
-            user_id: user_id,
-            url: url,
-            hdl: hdl,
-            is_as: true,
-        })
-    }
-    pub fn alter_user_id(&mut self, user_id: String) {
-        self.user_id = user_id;
-    }
-    /// Log in to a Matrix homeserver, and return a client object.
-    pub fn login(username: &str, password: &str, url: &str, hdl: &Handle) -> MatrixFuture<Self> {
+    /// Log in to a Matrix homeserver with a username and password, and return a client object.
+    /// 
+    /// ## Parameters
+    ///
+    /// - `username`: the username of the account to use (NB: not a MXID)
+    /// - `password`: the password of the account to use
+    /// - `url`: the URL of the homeserver
+    /// - `hdl`: Tokio reactor handle
+    pub fn login_password(username: &str, password: &str, url: &str, hdl: &Handle) -> MatrixFuture<Self> {
         let conn = match HttpsConnector::new(4, hdl) {
             Ok(c) => c,
             Err(e) => return Box::new(futures::future::err(e.into()))
@@ -128,6 +106,46 @@ impl MatrixClient {
                 is_as: false,
             }
         }))
+    }
+    /// (for Application Services) Register a user with the given `user_id`.
+    pub fn as_register_user(&mut self, user_id: String) -> MatrixFuture<()> {
+        let uri: hyper::Uri = match format!("{}/_matrix/client/r0/register?access_token={}", self.url, self.access_token).parse() {
+            Ok(u) => u,
+            Err(e) => return Box::new(futures::future::err(e.into()))
+        };
+        let mut req = Request::new(Post, uri);
+        req.set_body(json!({
+            "type": "m.login.application_service",
+            "user": user_id
+        }).to_string());
+        self.send_discarding_request(req)
+    }
+    /// (for Application Services) Make a new AS client.
+    /// 
+    /// ## Parameters
+    ///
+    /// - `url`: homeserver URL
+    /// - `user_id`: user ID to impersonate (can be changed later, using `alter_user_id`)
+    /// - `as_token`: application service token
+    /// - `hdl`: Tokio reactor handle
+    pub fn as_new(url: String, user_id: String, as_token: String, hdl: &Handle) -> MatrixResult<Self> {
+        let conn = HttpsConnector::new(4, hdl)?;
+        let client = hyper::Client::configure()
+            .connector(conn)
+            .build(hdl);
+        let hdl = hdl.clone();
+        Ok(MatrixClient {
+            hyper: client,
+            access_token: as_token,
+            user_id: user_id,
+            url: url,
+            hdl: hdl,
+            is_as: true,
+        })
+    }
+    /// (for Application Services) Alter the user ID which this client is masquerading as.
+    pub fn as_alter_user_id(&mut self, user_id: String) {
+        self.user_id = user_id;
     }
 }
 impl MatrixRequestable for Rc<RefCell<MatrixClient>> {

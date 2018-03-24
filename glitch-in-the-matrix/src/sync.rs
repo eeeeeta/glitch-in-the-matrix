@@ -22,6 +22,7 @@ pub struct SyncStream<R> {
     pub(crate) cur_req: Option<MatrixFuture<SyncReply>>
 }
 impl<R> SyncStream<R> where R: MatrixRequestable {
+    /// Make a new `SyncStream` from a given `MatrixRequestable`.
     pub fn new(rq: R) -> Self {
         SyncStream {
             rq,

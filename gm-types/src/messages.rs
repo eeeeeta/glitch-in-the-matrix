@@ -31,6 +31,7 @@ pub struct AudioInfo {
     /// The size of the audio clip in bytes.
     pub size: u32
 }
+/// Information about a video.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct VideoInfo {
     /// The duration of the video in milliseconds.

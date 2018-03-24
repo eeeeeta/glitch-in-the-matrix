@@ -5,7 +5,9 @@ use types::content::root::types::Presence;
 use request::{MatrixRequest, MatrixRequestable};
 use hyper::Method::*;
 
+/// Contains methods relating to `/presence/` endpoints.
 pub struct PresenceManagement;
+
 impl PresenceManagement {
     /// Update our presence status.
     pub fn update_presence<R: MatrixRequestable>(rq: &mut R, p: Presence) -> MatrixFuture<()> {
