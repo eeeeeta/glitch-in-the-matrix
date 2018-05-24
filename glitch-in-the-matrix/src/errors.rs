@@ -29,7 +29,11 @@ pub enum MatrixError {
     /// If the body contained a valid `BadRequestReply`, the `BadRequest` variant will be used
     /// instead of this one.
     #[fail(display = "Request failed with HTTP status: {}", _0)]
-    HttpCode(::hyper::StatusCode),
+    HttpCode(::http::status::StatusCode),
+    #[fail(display = "Error in HTTP library: {}", _0)]
+    HttpError(::http::Error),
+    #[fail(display = "Invalid header value: {}", _0)]
+    InvalidHeaderValue(::http::header::InvalidHeaderValue),
     /// A request failed with an error from the homeserver.
     #[fail(display = "Error from homeserver: {:?}", _0)]
     BadRequest(super::types::replies::BadRequestReply)
@@ -38,6 +42,8 @@ derive_from!(MatrixError,
              Hyper, ::hyper::error::Error,
              Serde, ::serde_json::Error,
              UriError, ::hyper::error::UriError,
+             HttpError, ::http::Error,
+             InvalidHeaderValue, ::http::header::InvalidHeaderValue,
              Io, ::std::io::Error,
              Openssl, ::hyper_openssl::openssl::error::ErrorStack
             );

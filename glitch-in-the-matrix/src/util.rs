@@ -14,9 +14,6 @@ pub struct ResponseWrapper<T> {
     sc: StatusCode,
     _ph: PhantomData<T>,
 }
-pub struct UnitaryResponseWrapper {
-    inner: ResponseWrapper<()>
-}
 impl<T: DeserializeOwned> ResponseWrapper<T> {
     pub fn wrap(r: Response) -> Self {
         let sc = r.status();
@@ -31,17 +28,10 @@ impl<T: DeserializeOwned> ResponseWrapper<T> {
                 return Err(MatrixError::BadRequest(e));
             }
             else {
-                return Err(MatrixError::HttpCode(self.sc.clone()));
+                return Err(MatrixError::HttpCode(self.sc.into()));
             }
         }
         Ok(Async::Ready(resp))
-    }
-}
-impl UnitaryResponseWrapper {
-    pub fn wrap(r: Response) -> Self {
-        Self {
-            inner: ResponseWrapper::<()>::wrap(r)
-        }
     }
 }
 impl<T: DeserializeOwned> Future for ResponseWrapper<T> {
@@ -56,12 +46,4 @@ impl<T: DeserializeOwned> Future for ResponseWrapper<T> {
         Ok(Async::Ready(data))
     }
 }
-impl Future for UnitaryResponseWrapper {
-    type Item = ();
-    type Error = MatrixError;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        try_ready!(self.inner._poll());
-        Ok(Async::Ready(()))
-    }
-}

@@ -32,7 +32,9 @@ fn main() {
     // We discard the results of the initial `/sync`, because we only want to echo
     // new requests.
     let fut = ss.skip(1).for_each(|sync| {
+        println!("[*] new sync response");
         for (room, evt) in sync.iter_events() {
+            println!("[*] in room {:?}: {:#?}", room, evt);
             if let Some(ref rd) = evt.room_data {
                 // only echo messages from other users
                 if rd.sender == mx.get_user_id() {
@@ -43,6 +45,7 @@ fn main() {
                 hdl.spawn(rc.read_receipt(&rd.event_id).map(|_| ()).map_err(|_| ()));
                 if let Content::RoomMessage(ref m) = evt.content {
                     if let Message::Text { ref body, .. } = *m {
+                        println!("[*] new message: {}", body);
                         hdl.spawn(rc.send_simple(body.to_owned()).map(|_| ()).map_err(|_| ()));
                     }
                 }

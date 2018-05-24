@@ -1,18 +1,19 @@
 //! Presence management.
 
-use super::MatrixFuture;
 use types::content::root::types::Presence;
 use request::{MatrixRequest, MatrixRequestable};
-use hyper::Method::*;
+use http::Method;
+use errors::MatrixError;
+use futures::Future;
 
 /// Contains methods relating to `/presence/` endpoints.
 pub struct PresenceManagement;
 
 impl PresenceManagement {
     /// Update our presence status.
-    pub fn update_presence<R: MatrixRequestable>(rq: &mut R, p: Presence) -> MatrixFuture<()> {
+    pub fn update_presence<R: MatrixRequestable>(rq: &mut R, p: Presence) -> impl Future<Item = (), Error = MatrixError> {
         MatrixRequest::new_with_body_ser(
-            Put,
+            Method::PUT,
             format!("/presence/{}/status", rq.get_user_id()),
             json!({
                 "presence": p

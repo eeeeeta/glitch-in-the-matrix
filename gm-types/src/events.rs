@@ -27,8 +27,10 @@ pub struct RoomEventData {
     /// The globally unique event identifier.
     pub event_id: String,
     /// The room associated with this event.
+    ///
+    /// This will be blank, if it's from the `timeline` part of a sync response.
     #[serde(rename = "room_id")]
-    pub room: Room<'static>,
+    pub room: Option<Room<'static>>,
     /// The fully-qualified user ID of the user who sent this event.
     pub sender: String,
     /// Timestamp in milliseconds on originating homeserver when this event was sent.

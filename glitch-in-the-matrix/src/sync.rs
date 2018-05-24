@@ -1,25 +1,25 @@
 //! Utilities for using the long-polling `/sync` API.
 
-use hyper::Method::*;
 use types::sync::*;
 use std::collections::HashMap;
-use super::MatrixFuture;
-use request::{MatrixRequest, MatrixRequestable};
+use request::{MatrixRequest, MatrixRequestable, TypedApiResponse};
 use request::apis::r0::ClientApi;
 use futures::*;
 use errors::*;
+use http::Method;
+use futures::Future;
 
 /// A `Stream` that yields constant replies to `/sync`.
 ///
 /// This calls the long-polling `/sync` API, which will wait until replies come
 /// in and send them to the client. If you want to reduce the wait time, use the
 /// `set_timeout()` function.
-pub struct SyncStream<R> {
+pub struct SyncStream<R> where R: MatrixRequestable {
     pub(crate) rq: R,
     pub(crate) last_batch: Option<String>,
     pub(crate) set_presence: bool,
     pub(crate) timeout: u64,
-    pub(crate) cur_req: Option<MatrixFuture<SyncReply>>
+    pub(crate) cur_req: Option<TypedApiResponse<SyncReply, R::SendRequestFuture, R::ResponseBodyFuture>>
 }
 impl<R> SyncStream<R> where R: MatrixRequestable {
     /// Make a new `SyncStream` from a given `MatrixRequestable`.
@@ -67,7 +67,7 @@ impl<R> SyncStream<R> where R: MatrixRequestable {
             params.insert("timeout".into(), self.timeout.to_string().into());
         }
         MatrixRequest {
-            meth: Get,
+            meth: Method::GET,
             endpoint: "/sync".into(),
             params,
             body: (),
@@ -98,7 +98,11 @@ impl<R> Stream for SyncStream<R> where R: MatrixRequestable {
                 }
             }
             let req = self.req();
-            self.cur_req = Some(req.send(&mut self.rq));
+            let req = match req.make_request(&mut self.rq) {
+                Ok(r) => r,
+                Err(e) => return Err(e.into())
+            };
+            self.cur_req = Some(self.rq.typed_api_call(req, false));
         }
     }
 }

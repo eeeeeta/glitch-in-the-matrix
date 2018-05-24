@@ -9,10 +9,11 @@
 //!
 //! Licensed under CC0.
 
-#![deny(missing_docs)]
+#![warn(missing_docs)]
 
 extern crate serde;
 #[macro_use] extern crate serde_json;
+pub extern crate http;
 extern crate hyper;
 extern crate hyper_openssl;
 extern crate failure;
@@ -24,7 +25,6 @@ extern crate uuid;
 pub extern crate gm_types as types;
 
 pub mod errors;
-pub mod http;
 pub mod room;
 pub mod request;
 pub mod sync;
@@ -36,30 +36,24 @@ mod util;
 use util::*;
 use errors::*;
 use types::replies::*;
-use hyper::Method;
-use Method::*;
-use hyper::client::Request;
+use futures::future::Either;
+use hyper::client::{Client, HttpConnector};
+use http::{Request, Response, Method};
 use hyper_openssl::HttpsConnector;
-use serde::de::DeserializeOwned;
 use tokio_core::reactor::Handle;
 use futures::*;
 use request::{MatrixRequestable, MatrixRequest};
 use std::borrow::Cow;
-use std::rc::Rc;
-use std::cell::RefCell;
 use uuid::Uuid;
+use std::cell::RefCell;
+use std::rc::Rc;
 
-/// A `Future` with a `MatrixError` error type. Returned by most library
-/// functions.
-///
-/// Yes, I know this is a `Box`, and that sucks a whoole bunch. I'm waiting
-/// for `impl Trait` to arrive to save us from this madness.
-pub type MatrixFuture<T> = Box<Future<Item=T, Error=MatrixError>>;
-
+#[allow(missing_docs)]
+type MatrixHyper = Client<HttpsConnector<HttpConnector>>;
 /// A connection to a Matrix homeserver, using the `hyper` crate.
 #[derive(Clone)]
 pub struct MatrixClient {
-    hyper: http::MatrixHyper,
+    hyper: MatrixHyper,
     access_token: String,
     hdl: Handle,
     user_id: String,
@@ -75,19 +69,19 @@ impl MatrixClient {
     /// - `password`: the password of the account to use
     /// - `url`: the URL of the homeserver
     /// - `hdl`: Tokio reactor handle
-    pub fn login_password(username: &str, password: &str, url: &str, hdl: &Handle) -> MatrixFuture<Self> {
+    pub fn login_password(username: &str, password: &str, url: &str, hdl: &Handle) -> impl Future<Item = Self, Error = MatrixError> {
         let conn = match HttpsConnector::new(4, hdl) {
             Ok(c) => c,
-            Err(e) => return Box::new(futures::future::err(e.into()))
+            Err(e) => return Either::B(futures::future::err(e.into()))
         };
         let client = hyper::Client::configure()
             .connector(conn)
             .build(hdl);
         let uri: hyper::Uri = match format!("{}/_matrix/client/r0/login", url).parse() {
             Ok(u) => u,
-            Err(e) => return Box::new(futures::future::err(e.into()))
+            Err(e) => return Either::B(futures::future::err(e.into()))
         };
-        let mut req = Request::new(Post, uri);
+        let mut req = hyper::Request::new(hyper::Method::Post, uri);
         req.set_body(json!({
             "type": "m.login.password",
             "user": username,
@@ -96,7 +90,7 @@ impl MatrixClient {
         let resp = client.request(req).map_err(|e| e.into()).and_then(ResponseWrapper::<LoginReply>::wrap);
         let hdl = hdl.clone();
         let url = url.to_string();
-        Box::new(resp.map(move |rpl| {
+        Either::A(resp.map(move |rpl| {
             MatrixClient {
                 hyper: client,
                 access_token: rpl.access_token,
@@ -108,17 +102,20 @@ impl MatrixClient {
         }))
     }
     /// (for Application Services) Register a user with the given `user_id`.
-    pub fn as_register_user(&mut self, user_id: String) -> MatrixFuture<()> {
-        let uri: hyper::Uri = match format!("{}/_matrix/client/r0/register?access_token={}", self.url, self.access_token).parse() {
-            Ok(u) => u,
-            Err(e) => return Box::new(futures::future::err(e.into()))
-        };
-        let mut req = Request::new(Post, uri);
-        req.set_body(json!({
+    pub fn as_register_user(&mut self, user_id: String) -> impl Future<Item = (), Error = MatrixError> {
+        let body = json!({
             "type": "m.login.application_service",
             "user": user_id
-        }).to_string());
-        self.send_discarding_request(req)
+        }).to_string().into_bytes();
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri(format!("{}/_matrix/client/r0/register?access_token={}", self.url, self.access_token))
+            .body(body);
+        let req = match req {
+            Ok(u) => u,
+            Err(e) => return Either::B(futures::future::err(e.into()))
+        };
+        Either::A(self.typed_api_call(req, true))
     }
     /// (for Application Services) Make a new AS client.
     /// 
@@ -150,6 +147,10 @@ impl MatrixClient {
 }
 impl MatrixRequestable for Rc<RefCell<MatrixClient>> {
     type Txnid = Uuid;
+    type ResponseBody = hyper::Chunk;
+    type ResponseBodyFuture = MxClientResponseBodyFuture;
+    type SendRequestFuture = MxClientSendRequestFuture;
+
     fn get_url(&self) -> Cow<str> {
         self.borrow().url.clone().into()
     }
@@ -165,19 +166,54 @@ impl MatrixRequestable for Rc<RefCell<MatrixClient>> {
     fn is_as(&self) -> bool {
         self.borrow().is_as
     }
-    fn send_request<T>(&mut self, req: Request) -> MatrixFuture<T> where T: DeserializeOwned + 'static {
-        Box::new(self.borrow_mut().hyper.request(req)
-                 .map_err(|e| e.into())
-                 .and_then(ResponseWrapper::<T>::wrap))
+    fn send_request(&mut self, req: http::Request<Vec<u8>>) -> Self::SendRequestFuture {
+        use hyper::server::Service;
+
+        let (parts, body) = req.into_parts();
+        let body = hyper::Body::from(body);
+        let req = Request::from_parts(parts, body);
+
+        MxClientSendRequestFuture {
+            inner: self.borrow_mut().hyper.call(req.into())
+        }
     }
-    fn send_discarding_request(&mut self, req: Request) -> MatrixFuture<()> {
-        Box::new(self.borrow_mut().hyper.request(req)
-                 .map_err(|e| e.into())
-                 .and_then(UnitaryResponseWrapper::wrap))
+}
+/// The `ResponseBodyFuture` of a `MatrixClient`.
+pub struct MxClientResponseBodyFuture {
+    inner: futures::stream::Concat2<hyper::Body>
+}
+impl Future for MxClientResponseBodyFuture {
+    type Item = hyper::Chunk;
+    type Error = MatrixError;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        let resp = try_ready!(self.inner.poll());
+        Ok(Async::Ready(resp))
+    }
+}
+/// The `SendRequestFuture` of a `MatrixClient`.
+pub struct MxClientSendRequestFuture {
+    inner: hyper::client::FutureResponse 
+}
+impl Future for MxClientSendRequestFuture {
+    type Item = Response<MxClientResponseBodyFuture>;
+    type Error = MatrixError;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        let req: http::Response<_> = try_ready!(self.inner.poll()).into();
+        let (parts, body) = req.into_parts();
+        let body = MxClientResponseBodyFuture {
+            inner: body.concat2()
+        };
+        let resp = Response::from_parts(parts, body);
+        Ok(Async::Ready(resp))
     }
 }
 impl MatrixRequestable for MatrixClient {
     type Txnid = Uuid;
+    type ResponseBody = hyper::Chunk;
+    type ResponseBodyFuture = MxClientResponseBodyFuture;
+    type SendRequestFuture = MxClientSendRequestFuture;
 
     fn get_url(&self) -> Cow<str> {
         (&self.url as &str).into()
@@ -194,22 +230,23 @@ impl MatrixRequestable for MatrixClient {
     fn is_as(&self) -> bool {
         self.is_as
     }
-    fn send_request<T>(&mut self, req: Request) -> MatrixFuture<T> where T: DeserializeOwned + 'static {
-        Box::new(self.hyper.request(req)
-                 .map_err(|e| e.into())
-                 .and_then(ResponseWrapper::<T>::wrap))
-    }
-    fn send_discarding_request(&mut self, req: Request) -> MatrixFuture<()> {
-        Box::new(self.hyper.request(req)
-                 .map_err(|e| e.into())
-                 .and_then(UnitaryResponseWrapper::wrap))
+    fn send_request(&mut self, req: http::Request<Vec<u8>>) -> Self::SendRequestFuture {
+        use hyper::server::Service;
+
+        let (parts, body) = req.into_parts();
+        let body = hyper::Body::from(body);
+        let req = Request::from_parts(parts, body);
+
+        MxClientSendRequestFuture {
+            inner: self.hyper.call(req.into())
+        }
     }
 }
 impl Drop for MatrixClient {
     /// Invalidates our access token, so we don't have millions of devices.
     /// Also sets us as offline.
     fn drop(&mut self) {
-        let fut = MatrixRequest::new_basic(Post, "/logout")
+        let fut = MatrixRequest::new_basic(Method::POST, "/logout")
             .discarding_send(self).map_err(|_| ()).map(|_| ());
         self.hdl.spawn(fut);
     }

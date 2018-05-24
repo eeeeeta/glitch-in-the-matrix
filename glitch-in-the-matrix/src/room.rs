@@ -4,13 +4,12 @@ use types::replies::*;
 use types::messages::Message;
 use types::events::Event;
 use types::content::room::PowerLevels;
-use super::MatrixFuture;
 use request::{MatrixRequestable, MatrixRequest};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use futures::*;
 use errors::*;
-use hyper::Method::*;
+use http::Method;
 
 pub use types::room::Room;
 
@@ -21,21 +20,37 @@ pub use types::room::Room;
 /// methods for `Room` - most notably, you can make a `RoomClient`, which is how
 /// you actually do anything room-related.
 pub trait RoomExt<'a> {
-    /// Requests that the server resolve a room alias to a room (ID).
-    ///
-    /// The server will use the federation API to resolve the alias if the
-    /// domain part of the alias does not correspond to the server's own domain.
-    fn from_alias<R: MatrixRequestable>(cli: &mut R, alias: &str) -> MatrixFuture<Self>;
-    /// Joins a room by identifier or alias.
-    fn join<R: MatrixRequestable>(cli: &mut R, room: &str) -> MatrixFuture<Self>;
-    /// Creates a room, with given options.
-    fn create<R: MatrixRequestable>(cli: &mut R, opts: RoomCreationOptions) -> MatrixFuture<Self>;
     /// Use an implementor of `MatrixRequestable` to make a `RoomClient`, an object used to call
     /// endpoints relating to rooms.
     ///
     /// If you want to do pretty much anything *with* this `Room`, you probably
     /// want to call this at some point.
     fn cli<'b, 'c, T>(&'b self, cli: &'c mut T) -> RoomClient<'b, 'a, 'c, T> where T: MatrixRequestable;
+}
+/// Contains endpoints relating to creating or joining rooms.
+pub struct NewRoom;
+impl NewRoom {
+    /// Requests that the server resolve a room alias to a room (ID).
+    ///
+    /// The server will use the federation API to resolve the alias if the
+    /// domain part of the alias does not correspond to the server's own domain.
+    pub fn from_alias<R: MatrixRequestable>(cli: &mut R, alias: &str) -> impl Future<Item = Room<'static>, Error = MatrixError> {
+        MatrixRequest::new_basic(Method::GET, format!("/directory/room/{}", alias))
+            .send(cli)
+            .map(|RoomAliasReply { room, .. }| room)
+    }
+    /// Joins a room by identifier or alias.
+    pub fn join<R: MatrixRequestable>(cli: &mut R, room: &str) -> impl Future<Item = Room<'static>, Error = MatrixError> {
+        MatrixRequest::new_basic(Method::POST, format!("/join/{}", room))
+            .send(cli)
+            .map(|JoinReply { room }| room)
+    }
+    /// Creates a room, with given options.
+    pub fn create<R: MatrixRequestable>(cli: &mut R, opts: RoomCreationOptions) -> impl Future<Item = Room<'static>, Error = MatrixError> {
+        MatrixRequest::new_with_body_ser(Method::POST, "/createRoom", opts)
+            .send(cli)
+            .map(|JoinReply { room }| room)
+    }
 }
 /// A `Room` with a `MatrixRequestable` type, which you can use to call endpoints relating
 /// to rooms.
@@ -46,22 +61,7 @@ pub struct RoomClient<'a, 'b: 'a, 'c, T: 'c> {
     pub cli: &'c mut T
 }
 impl<'a> RoomExt<'a> for Room<'a> {
-    fn from_alias<R: MatrixRequestable>(cli: &mut R, alias: &str) -> MatrixFuture<Self> {
-        Box::new(MatrixRequest::new_basic(Get, format!("/directory/room/{}", alias))
-                 .send(cli)
-                 .map(|RoomAliasReply { room, .. }| room))
-    }
-    fn join<R: MatrixRequestable>(cli: &mut R, room: &str) -> MatrixFuture<Self> {
-        Box::new(MatrixRequest::new_basic(Post, format!("/join/{}", room))
-                 .send(cli)
-                 .map(|JoinReply { room }| room))
-    }
-    fn create<R: MatrixRequestable>(cli: &mut R, opts: RoomCreationOptions) -> MatrixFuture<Self> {
-        Box::new(MatrixRequest::new_with_body_ser(Post, "/createRoom", opts)
-                 .send(cli)
-                 .map(|JoinReply { room }| room))
-    }
-    fn cli<'b, 'c, T>(&'b self, cli: &'c mut T) -> RoomClient<'b, 'a, 'c, T> where T: MatrixRequestable {
+   fn cli<'b, 'c, T>(&'b self, cli: &'c mut T) -> RoomClient<'b, 'a, 'c, T> where T: MatrixRequestable {
         RoomClient {
             room: self,
             cli
@@ -70,9 +70,9 @@ impl<'a> RoomExt<'a> for Room<'a> {
 }
 impl<'a, 'b, 'c, R> RoomClient<'a, 'b, 'c, R> where R: MatrixRequestable {
     /// Sends a message to this room.
-    pub fn send(&mut self, msg: Message) -> MatrixFuture<SendReply> {
+    pub fn send(&mut self, msg: Message) -> impl Future<Item = SendReply, Error = MatrixError> {
         MatrixRequest::new_with_body_ser(
-            Put,
+            Method::PUT,
             format!("/rooms/{}/send/m.room.message/{}",
                     self.room.id,
                     self.cli.get_txnid()),
@@ -81,7 +81,7 @@ impl<'a, 'b, 'c, R> RoomClient<'a, 'b, 'c, R> where R: MatrixRequestable {
     }
     /// Wrapper function that sends a `Message::Notice` with the specified unformatted text
     /// to this room. Provided for convenience purposes.
-    pub fn send_simple<T: Into<String>>(&mut self, msg: T) -> MatrixFuture<SendReply> {
+    pub fn send_simple<T: Into<String>>(&mut self, msg: T) -> impl Future<Item = SendReply, Error = MatrixError> {
         let msg = Message::Notice {
             body: msg.into(),
             formatted_body: None,
@@ -91,7 +91,7 @@ impl<'a, 'b, 'c, R> RoomClient<'a, 'b, 'c, R> where R: MatrixRequestable {
     }
     /// Wrapper function that sends a `Message::Notice` with the specified HTML-formatted text
     /// (and accompanying unformatted text, if given) to this room.
-    pub fn send_html<T, U>(&mut self, msg: T, unformatted: U) -> MatrixFuture<SendReply>
+    pub fn send_html<T, U>(&mut self, msg: T, unformatted: U) -> impl Future<Item = SendReply, Error = MatrixError>
         where T: Into<String>, U: Into<Option<String>> {
         let m = msg.into();
         let msg = Message::Notice {
@@ -102,8 +102,8 @@ impl<'a, 'b, 'c, R> RoomClient<'a, 'b, 'c, R> where R: MatrixRequestable {
         self.send(msg)
     }
     /// Send a read receipt for a given event ID.
-    pub fn read_receipt(&mut self, eventid: &str) -> MatrixFuture<()> {
-        MatrixRequest::new_basic(Post, format!("/rooms/{}/receipt/m.read/{}", self.room.id, eventid))
+    pub fn read_receipt(&mut self, eventid: &str) -> impl Future<Item = (), Error = MatrixError> {
+        MatrixRequest::new_basic(Method::POST, format!("/rooms/{}/receipt/m.read/{}", self.room.id, eventid))
             .discarding_send(self.cli)
     }
     /// Looks up the contents of a state event with type `ev_type` and state key
@@ -118,8 +118,8 @@ impl<'a, 'b, 'c, R> RoomClient<'a, 'b, 'c, R> where R: MatrixRequestable {
     ///
     /// If the event was not found, an error will be thrown of type
     /// `HttpCode(http::StatusCode::NotFound)`.
-    pub fn get_typed_state<T: DeserializeOwned + 'static>(&mut self, ev_type: &str, key: Option<&str>) -> MatrixFuture<T> {
-        MatrixRequest::new_basic(Get, format!("/rooms/{}/state/{}/{}",
+    pub fn get_typed_state<T: DeserializeOwned + 'static>(&mut self, ev_type: &str, key: Option<&str>) -> impl Future<Item = T, Error = MatrixError> {
+        MatrixRequest::new_basic(Method::GET, format!("/rooms/{}/state/{}/{}",
                                               self.room.id,
                                               ev_type,
                                               key.unwrap_or("")))
@@ -132,9 +132,9 @@ impl<'a, 'b, 'c, R> RoomClient<'a, 'b, 'c, R> where R: MatrixRequestable {
     /// Like `get_state`, the value here can be any object that implements
     /// `Serialize`, allowing you to use the state API to store arbitrary
     /// objects. See the `get_state` docs for more.
-    pub fn set_typed_state<T: Serialize>(&mut self, ev_type: &str, key: Option<&str>, val: T) -> MatrixFuture<SetStateReply> {
+    pub fn set_typed_state<T: Serialize>(&mut self, ev_type: &str, key: Option<&str>, val: T) -> impl Future<Item = SetStateReply, Error = MatrixError> {
         MatrixRequest::new_with_body_ser(
-            Put,
+            Method::PUT,
             format!("/rooms/{}/state/{}/{}",
                     self.room.id,
                     ev_type, key.unwrap_or("")),
@@ -142,21 +142,21 @@ impl<'a, 'b, 'c, R> RoomClient<'a, 'b, 'c, R> where R: MatrixRequestable {
         ).send(self.cli)
     }
     /// Get the state events for the current state of a room.
-    pub fn get_all_state(&mut self) -> MatrixFuture<Vec<Event>> {
-        MatrixRequest::new_basic(Get, format!("/rooms/{}/state", self.room.id))
+    pub fn get_all_state(&mut self) -> impl Future<Item = Vec<Event>, Error = MatrixError> {
+        MatrixRequest::new_basic(Method::GET, format!("/rooms/{}/state", self.room.id))
             .send(self.cli)
     }
     /// Get a single event for this room, based on `event_id`.
     ///
     /// You must have permission to retrieve this event (e.g. by being a member of the room for
     /// this event)
-    pub fn get_event(&mut self, id: &str) -> MatrixFuture<Event> {
-        MatrixRequest::new_basic(Get, format!("/rooms/{}/event/{}", self.room.id, id))
+    pub fn get_event(&mut self, id: &str) -> impl Future<Item = Event, Error = MatrixError> {
+        MatrixRequest::new_basic(Method::GET, format!("/rooms/{}/event/{}", self.room.id, id))
             .send(self.cli)
     }
     /// Get the list of member events for this room.
-    pub fn get_members(&mut self) -> MatrixFuture<ChunkReply> {
-        MatrixRequest::new_basic(Get, format!("/rooms/{}/members", self.room.id))
+    pub fn get_members(&mut self) -> impl Future<Item = ChunkReply, Error = MatrixError> {
+        MatrixRequest::new_basic(Method::GET, format!("/rooms/{}/members", self.room.id))
             .send(self.cli)
     }
     /// Get the list of joined members in this room.
@@ -167,8 +167,8 @@ impl<'a, 'b, 'c, R> RoomClient<'a, 'b, 'c, R> where R: MatrixRequestable {
     /// This API is primarily for Application Services and should be faster to
     /// respond than `get_members()`, as it can be implemented more efficiently
     /// on the server.
-    pub fn get_joined_members(&mut self) -> MatrixFuture<JoinedMembersReply> {
-        MatrixRequest::new_basic(Get, format!("/rooms/{}/joined_members", self.room.id))
+    pub fn get_joined_members(&mut self) -> impl Future<Item = JoinedMembersReply, Error = MatrixError> {
+        MatrixRequest::new_basic(Method::GET, format!("/rooms/{}/joined_members", self.room.id))
             .send(self.cli)
     }
     /// This API returns a list of message and state events for a room. It uses
@@ -186,8 +186,8 @@ impl<'a, 'b, 'c, R> RoomClient<'a, 'b, 'c, R> where R: MatrixRequestable {
     ///   this endpoint.
     /// - `backward`: Whether to paginate backward, or forward; true = back-pagination.
     /// - `limit`: The maximum number of events to return. (default: 10)
-    pub fn get_messages(&mut self, from: &str, to: Option<&str>, backward: bool, limit: Option<u32>) -> MatrixFuture<MessagesReply> {
-        let mut req = MatrixRequest::new_basic(Get, format!("/rooms/{}/messages", self.room.id));
+    pub fn get_messages(&mut self, from: &str, to: Option<&str>, backward: bool, limit: Option<u32>) -> impl Future<Item = MessagesReply, Error = MatrixError> {
+        let mut req = MatrixRequest::new_basic(Method::GET, format!("/rooms/{}/messages", self.room.id));
         req.params.insert("from".into(), from.into());
         if let Some(to) = to {
             req.params.insert("to".into(), to.into());
@@ -207,10 +207,10 @@ impl<'a, 'b, 'c, R> RoomClient<'a, 'b, 'c, R> where R: MatrixRequestable {
     /// Users may redact their own events, and any user with a power level
     /// greater than or equal to the redact power level of the room may redact
     /// events there.
-    pub fn redact(&mut self, eventid: &str, reason: Option<&str>) -> MatrixFuture<()> {
+    pub fn redact(&mut self, eventid: &str, reason: Option<&str>) -> impl Future<Item = (), Error = MatrixError> {
         let mut body = vec![];
-        body.extend(reason.map(|x| ("reason", x)));
-        MatrixRequest::new_with_body(Post, format!("/rooms/{}/redact/{}/{}",
+        body.extend(reason.map(|x| ("reason", x.to_string())));
+        MatrixRequest::new_with_body(Method::POST, format!("/rooms/{}/redact/{}/{}",
                                                    self.room.id, eventid, self.cli.get_txnid()),
                                      body)
             .discarding_send(self.cli)
@@ -219,10 +219,10 @@ impl<'a, 'b, 'c, R> RoomClient<'a, 'b, 'c, R> where R: MatrixRequestable {
     /// milliseconds where N is the value specified in the timeout key.
     /// Alternatively, if typing is false, it tells the server that the user has
     /// stopped typing.
-    pub fn typing(&mut self, typing: bool, timeout: Option<usize>) -> MatrixFuture<()> {
+    pub fn typing(&mut self, typing: bool, timeout: Option<usize>) -> impl Future<Item = (), Error = MatrixError> {
         let mut body = vec![("typing", typing.to_string())];
         body.extend(timeout.map(|x| ("timeout", x.to_string())));
-        MatrixRequest::new_with_body(Post, format!("/rooms/{}/typing/{}",
+        MatrixRequest::new_with_body(Method::POST, format!("/rooms/{}/typing/{}",
                                                    self.room.id, self.cli.get_user_id()),
                                      body)
             .discarding_send(self.cli)
@@ -235,8 +235,8 @@ impl<'a, 'b, 'c, R> RoomClient<'a, 'b, 'c, R> where R: MatrixRequestable {
     ///
     /// After a user has joined a room, the room will appear as an entry in the
     /// values in the `SyncStream`.
-    pub fn join(&mut self) -> MatrixFuture<()> {
-        MatrixRequest::new_basic(Post, format!("/rooms/{}/join", self.room.id))
+    pub fn join(&mut self) -> impl Future<Item = (), Error = MatrixError> {
+        MatrixRequest::new_basic(Method::POST, format!("/rooms/{}/join", self.room.id))
             .discarding_send(self.cli)
     }
     /// This API stops a user participating in a particular room.
@@ -250,8 +250,8 @@ impl<'a, 'b, 'c, R> RoomClient<'a, 'b, 'c, R> where R: MatrixRequestable {
     ///
     /// The user will still be allowed to retrieve history from the room which
     /// they were previously allowed to see.
-    pub fn leave(&mut self) -> MatrixFuture<()> {
-        MatrixRequest::new_basic(Post, format!("/rooms/{}/leave", self.room.id))
+    pub fn leave(&mut self) -> impl Future<Item = (), Error = MatrixError> {
+        MatrixRequest::new_basic(Method::POST, format!("/rooms/{}/leave", self.room.id))
             .discarding_send(self.cli)
     }
     /// This API stops a user remembering about a particular room.
@@ -263,18 +263,18 @@ impl<'a, 'b, 'c, R> RoomClient<'a, 'b, 'c, R> where R: MatrixRequestable {
     ///
     /// If the user is currently joined to the room, they will implicitly leave
     /// the room as part of this API call.
-    pub fn forget(&mut self) -> MatrixFuture<()> {
-        MatrixRequest::new_basic(Post, format!("/rooms/{}/forget", self.room.id))
+    pub fn forget(&mut self) -> impl Future<Item = (), Error = MatrixError> {
+        MatrixRequest::new_basic(Method::POST, format!("/rooms/{}/forget", self.room.id))
             .discarding_send(self.cli)
     }
     /// Kick a user from the room.
     ///
     /// The caller must have the required power level in order to perform this
     /// operation.
-    pub fn kick_user(&mut self, user_id: &str, reason: Option<&str>) -> MatrixFuture<()> {
-        let mut body = vec![("user_id", user_id)];
-        body.extend(reason.map(|x| ("reason", x)));
-        MatrixRequest::new_with_body(Post, format!("/rooms/{}/kick", self.room.id),
+    pub fn kick_user(&mut self, user_id: &str, reason: Option<&str>) -> impl Future<Item = (), Error = MatrixError> {
+        let mut body = vec![("user_id", user_id.to_string())];
+        body.extend(reason.map(|x| ("reason", x.to_string())));
+        MatrixRequest::new_with_body(Method::POST, format!("/rooms/{}/kick", self.room.id),
                                      body)
             .discarding_send(self.cli)
     }
@@ -284,10 +284,10 @@ impl<'a, 'b, 'c, R> RoomClient<'a, 'b, 'c, R> where R: MatrixRequestable {
     /// it until they are unbanned.
     ///
     /// The caller must have the required power level in order to perform this operation.
-    pub fn ban_user(&mut self, user_id: &str, reason: Option<&str>) -> MatrixFuture<()> {
-        let mut body = vec![("user_id", user_id)];
-        body.extend(reason.map(|x| ("reason", x)));
-        MatrixRequest::new_with_body(Post, format!("/rooms/{}/ban", self.room.id),
+    pub fn ban_user(&mut self, user_id: &str, reason: Option<&str>) -> impl Future<Item = (), Error = MatrixError> {
+        let mut body = vec![("user_id", user_id.to_string())];
+        body.extend(reason.map(|x| ("reason", x.to_string())));
+        MatrixRequest::new_with_body(Method::POST, format!("/rooms/{}/ban", self.room.id),
                                      body)
             .discarding_send(self.cli)
     }
@@ -297,9 +297,9 @@ impl<'a, 'b, 'c, R> RoomClient<'a, 'b, 'c, R> where R: MatrixRequestable {
     ///
     /// The caller must have the required power level in order to perform this
     /// operation.
-    pub fn unban_user(&mut self, user_id: &str) -> MatrixFuture<()> {
-        MatrixRequest::new_with_body(Post, format!("/rooms/{}/unban", self.room.id),
-                                     vec![("user_id", user_id)])
+    pub fn unban_user(&mut self, user_id: &str) -> impl Future<Item = (), Error = MatrixError> {
+        MatrixRequest::new_with_body(Method::POST, format!("/rooms/{}/unban", self.room.id),
+                                     vec![("user_id", user_id.to_string())])
             .discarding_send(self.cli)
     }
     /// This API invites a user to participate in a particular room. They do not
@@ -316,9 +316,9 @@ impl<'a, 'b, 'c, R> RoomClient<'a, 'b, 'c, R> where R: MatrixRequestable {
     /// Matrix identifier of the invitee. The other is documented in the third
     /// party invites section of the Matrix spec, and is not implemented in
     /// *Glitch in the Matrix* (yet!)
-    pub fn invite_user(&mut self, user_id: &str) -> MatrixFuture<()> {
-        MatrixRequest::new_with_body(Post, format!("/rooms/{}/invite", self.room.id),
-                                     vec![("user_id", user_id)])
+    pub fn invite_user(&mut self, user_id: &str) -> impl Future<Item = (), Error = MatrixError> {
+        MatrixRequest::new_with_body(Method::POST, format!("/rooms/{}/invite", self.room.id),
+                                     vec![("user_id", user_id.to_string())])
             .discarding_send(self.cli)
     }
     /// Get a user's power level, falling back on the default value for the room
@@ -326,7 +326,7 @@ impl<'a, 'b, 'c, R> RoomClient<'a, 'b, 'c, R> where R: MatrixRequestable {
     ///
     /// The `user_id` is a `String` here, not a `&str`, because it is stored in
     /// a future that outlives this function.
-    pub fn get_user_power_level(&mut self, user_id: String) -> MatrixFuture<u32> {
+    pub fn get_user_power_level(&mut self, user_id: String) -> impl Future<Item = u32, Error = MatrixError> {
         let fut = self.get_typed_state::<PowerLevels>("m.room.power_levels", None);
         Box::new(fut.map(move |x| {
             if let Some(pl) = x.users.get(&user_id) {

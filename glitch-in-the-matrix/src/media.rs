@@ -1,42 +1,38 @@
 //! Media repository management.
 
-use futures;
-use super::MatrixFuture;
+use futures::{self, Future};
 use request::{self, MatrixRequest, MatrixRequestable};
-use hyper::Method::*;
+use http::Method;
 use std::collections::HashMap;
-use hyper::Body;
-use hyper::header::ContentType;
+use http::header::{HeaderValue, CONTENT_TYPE};
 use types::replies::UploadReply;
+use futures::future::Either;
+use errors::MatrixError;
 
 /// Contains media repository endpoints.
 pub struct Media;
 
 impl Media {
     /// Upload some data (convertible to a `Body`) of a given `ContentType`, like an image.
-    ///
-    /// `Body` is accessible via the `http` module. See the documentation there
-    /// for a complete reference of what implements `Into<Body>` - a quick
-    /// shortlist: `Vec<u8>`, `&'static [u8]` (not `&'a [u8]`, sadly), `String`,
-    /// `&'static str`.
-    ///
-    /// `ContentType` is accessible via the `http` module. See the documentation
-    /// there for more information on how to use it.
-    pub fn upload<T: Into<Body>, R: MatrixRequestable>(rq: &mut R, data: T, ct: ContentType) -> MatrixFuture<UploadReply> {
+    pub fn upload<T: Into<Vec<u8>>, R: MatrixRequestable>(rq: &mut R, data: T, content_type: &str) -> impl Future<Item = UploadReply, Error = MatrixError> {
         let req = MatrixRequest {
-            meth: Post,
+            meth: Method::POST,
             endpoint: "/upload".into(),
             params: HashMap::new(),
             body: (),
             typ: request::apis::r0::MediaApi
-        }.make_hyper(rq);
+        }.make_request(rq);
         let mut req = match req {
             Ok(r) => r,
-            Err(e) => return Box::new(futures::future::err(e.into()))
+            Err(e) => return Either::B(futures::future::err(e.into()))
         };
-        req.set_body(data.into());
-        req.headers_mut().set(ct);
-        rq.send_request(req)
+        *req.body_mut() = data.into();
+        let hv = match HeaderValue::from_str(content_type) {
+            Ok(r) => r,
+            Err(e) => return Either::B(futures::future::err(e.into()))
+        };
+        req.headers_mut().insert(CONTENT_TYPE, hv);
+        Either::A(rq.typed_api_call(req, false))
     }
 
 }
