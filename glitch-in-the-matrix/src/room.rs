@@ -125,6 +125,22 @@ impl<'a, 'b, 'c, R> RoomClient<'a, 'b, 'c, R> where R: MatrixRequestable {
                                               key.unwrap_or("")))
             .send(self.cli)
     }
+    pub fn get_typed_state_opt<T: DeserializeOwned + 'static>(&mut self, ev_type: &str, key: Option<&str>) -> impl Future<Item = Option<T>, Error = MatrixError> {
+       self.get_typed_state(ev_type, key)
+          .then(move |res| {
+             match res {
+                Ok(res) => Ok(Some(res)),
+                Err(e) => {
+                   if let MatrixError::BadRequest(ref brk) = e {
+                      if brk.errcode == "M_NOT_FOUND" {
+                         return Ok(None)
+                      }
+                   }
+                   Err(e)
+                }
+             }
+          })
+    }
     /// State events can be sent using this endpoint. These events will be
     /// overwritten if the <event type> (`ev_type`) and <state key> (`key`) all
     /// match.
