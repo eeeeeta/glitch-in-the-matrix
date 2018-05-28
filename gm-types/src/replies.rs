@@ -38,6 +38,12 @@ pub struct LoginReply {
     /// Will be the same as the corresponding parameter in the request, if one was specified.
     pub device_id: String
 }
+/// The reply obtained from the `/whoami` API.
+#[derive(Deserialize, Clone, Debug)]
+pub struct WhoamiReply {
+    /// The user the access token belongs to.
+    pub user_id: String
+}
 /// The reply obtained from getting a room alias.
 #[derive(Deserialize, Clone, Debug)]
 pub struct RoomAliasReply {

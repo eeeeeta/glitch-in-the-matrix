@@ -61,6 +61,34 @@ pub struct MatrixClient {
     is_as: bool
 }
 impl MatrixClient {
+    pub fn new_from_access_token(token: &str, url: &str, hdl: &Handle) -> impl Future<Item = Self, Error = MatrixError> {
+        let conn = match HttpsConnector::new(4, hdl) {
+            Ok(c) => c,
+            Err(e) => return Either::B(futures::future::err(e.into()))
+        };
+        let client = hyper::Client::configure()
+            .connector(conn)
+            .build(hdl);
+        let uri: hyper::Uri = match format!("{}/_matrix/client/r0/account/whoami?access_token={}", url, token).parse() {
+            Ok(u) => u,
+            Err(e) => return Either::B(futures::future::err(e.into()))
+        };
+        let mut req = hyper::Request::new(hyper::Method::Get, uri);
+        let resp = client.request(req).map_err(|e| e.into()).and_then(ResponseWrapper::<WhoamiReply>::wrap);
+        let hdl = hdl.clone();
+        let url = url.to_string();
+        let token = token.to_string();
+        Either::A(resp.map(move |rpl| {
+            MatrixClient {
+                hyper: client,
+                access_token: token,
+                user_id: rpl.user_id,
+                url: url,
+                hdl: hdl,
+                is_as: false,
+            }
+        }))
+    }
     /// Log in to a Matrix homeserver with a username and password, and return a client object.
     /// 
     /// ## Parameters
