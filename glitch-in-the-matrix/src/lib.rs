@@ -49,7 +49,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 #[allow(missing_docs)]
-type MatrixHyper = Client<HttpsConnector<HttpConnector>>;
+pub type MatrixHyper = Client<HttpsConnector<HttpConnector>>;
 /// A connection to a Matrix homeserver, using the `hyper` crate.
 #[derive(Clone)]
 pub struct MatrixClient {
@@ -171,6 +171,12 @@ impl MatrixClient {
     /// (for Application Services) Alter the user ID which this client is masquerading as.
     pub fn as_alter_user_id(&mut self, user_id: String) {
         self.user_id = user_id;
+    }
+    /// Convenience method that clones the MatrixClient's underlying HTTP client.
+    /// Useful if you don't want to have to make your own HTTP client, and need one
+    /// for some quick'n'dirty task.
+    pub fn get_hyper(&self) -> MatrixHyper {
+        self.hyper.clone()
     }
 }
 impl MatrixRequestable for Rc<RefCell<MatrixClient>> {
