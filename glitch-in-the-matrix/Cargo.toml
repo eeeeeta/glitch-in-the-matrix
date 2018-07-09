@@ -25,7 +25,7 @@ percent-encoding = "1.0"
 gm-types = { path = "../gm-types", version = "0.3" }
 
 [dev-dependencies]
-rpassword = "0.4.2"
+rpassword = "2.0.0"
 
 [features]
 gitm_deny_unknown = []
