@@ -8,6 +8,7 @@ homepage = "https://github.com/eeeeeta/glitch-in-the-matrix"
 keywords = ["chat", "matrix"]
 license = "CC0-1.0"
 repository = "https://github.com/eeeeeta/glitch-in-the-matrix"
+edition = "2018"
 
 [dependencies]
 serde = "1.0"

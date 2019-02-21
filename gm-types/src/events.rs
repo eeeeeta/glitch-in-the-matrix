@@ -5,7 +5,7 @@ use super::content::{Content, deserialize_content};
 use serde::*;
 use serde_json::Value;
 use serde::de;
-use room::Room;
+use crate::room::Room;
 
 /// Contains optional extra information about the event.
 #[derive(Serialize, Deserialize, Clone, Debug)]
