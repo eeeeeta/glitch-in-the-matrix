@@ -4,11 +4,11 @@ use types::replies::*;
 use types::messages::Message;
 use types::events::Event;
 use types::content::room::PowerLevels;
-use request::{MatrixRequestable, MatrixRequest};
+use crate::request::{MatrixRequestable, MatrixRequest};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use futures::*;
-use errors::*;
+use crate::errors::*;
 use http::Method;
 
 pub use types::room::Room;

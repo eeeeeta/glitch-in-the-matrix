@@ -2,10 +2,10 @@
 
 use types::sync::*;
 use std::collections::HashMap;
-use request::{MatrixRequest, MatrixRequestable, TypedApiResponse};
-use request::apis::r0::ClientApi;
+use crate::request::{MatrixRequest, MatrixRequestable, TypedApiResponse};
+use crate::request::apis::r0::ClientApi;
 use futures::*;
-use errors::*;
+use crate::errors::*;
 use http::Method;
 use futures::Future;
 

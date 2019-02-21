@@ -1,10 +1,10 @@
 //! Profile management.
 
 use types::replies::DisplaynameReply;
-use request::{MatrixRequest, MatrixRequestable};
+use crate::request::{MatrixRequest, MatrixRequestable};
 use http::Method;
 use futures::Future;
-use errors::MatrixError;
+use crate::errors::MatrixError;
 
 /// Contains methods relating to `/profile/` endpoints.
 pub struct Profile;

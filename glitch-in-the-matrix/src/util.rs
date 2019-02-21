@@ -1,6 +1,6 @@
 //! Utility wrappers used internally.
 
-use errors::*;
+use crate::errors::*;
 use types::replies::*;
 use hyper::{Body, StatusCode};
 use hyper::client::Response;
