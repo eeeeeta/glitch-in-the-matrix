@@ -1,13 +1,13 @@
 //! Media repository management.
 
 use futures::{self, Future};
-use request::{self, MatrixRequest, MatrixRequestable};
+use crate::request::{self, MatrixRequest, MatrixRequestable};
 use http::Method;
 use std::collections::HashMap;
 use http::header::{HeaderValue, CONTENT_TYPE};
 use types::replies::UploadReply;
 use futures::future::Either;
-use errors::MatrixError;
+use crate::errors::MatrixError;
 
 /// Contains media repository endpoints.
 pub struct Media;

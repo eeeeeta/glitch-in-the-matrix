@@ -6,7 +6,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use http::{Request, Response, Method};
 use futures::future::Either;
-use errors::{MatrixError, MatrixResult};
+use crate::errors::{MatrixError, MatrixResult};
 use types::replies::BadRequestReply;
 use serde_json;
 use percent_encoding::{utf8_percent_encode, DEFAULT_ENCODE_SET};
@@ -25,7 +25,7 @@ pub trait ApiType {
 pub mod apis {
     /// APIs at version r0.
     pub mod r0 {
-        use request::ApiType;
+        use crate::request::ApiType;
         use std::borrow::Cow;
         /// `/_matrix/client/r0`
         pub struct ClientApi;

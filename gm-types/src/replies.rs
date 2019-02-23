@@ -1,9 +1,9 @@
 //! Replies obtained from calling various API endpoints.
-use room::Room;
-use events::Event;
+use crate::room::Room;
+use crate::events::Event;
 use std::collections::HashMap;
 use serde_json::Value;
-use content::room::Member;
+use crate::content::room::Member;
 
 /// The reply obtained from `/send`.
 #[derive(Deserialize, Clone, Debug)]

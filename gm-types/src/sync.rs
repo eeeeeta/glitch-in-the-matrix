@@ -1,7 +1,7 @@
 //! Types returned from the `/sync` endpoint.
 use std::collections::HashMap;
-use room::Room;
-use events::{Event, Events};
+use crate::room::Room;
+use crate::events::{Event, Events};
 use std::slice;
 
 /// Counts of unread notifications for a room.

@@ -1,9 +1,9 @@
 //! Presence management.
 
 use types::content::root::types::Presence;
-use request::{MatrixRequest, MatrixRequestable};
+use crate::request::{MatrixRequest, MatrixRequestable};
 use http::Method;
-use errors::MatrixError;
+use crate::errors::MatrixError;
 use futures::Future;
 
 /// Contains methods relating to `/presence/` endpoints.
