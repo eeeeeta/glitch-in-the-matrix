@@ -10,8 +10,8 @@ use crate::errors::MatrixError;
 pub struct Profile;
 
 impl Profile {
-    /// Get the displayname of a given user ID. This API may be used to fetch the user's own displayname or 
-    /// to query the name of other users; either locally or on remote homeservers. 
+    /// Get the displayname of a given user ID. This API may be used to fetch the user's own displayname or
+    /// to query the name of other users; either locally or on remote homeservers.
     pub fn get_displayname<R: MatrixRequestable>(rq: &mut R, user_id: &str) -> impl Future<Item = DisplaynameReply, Error = MatrixError> {
         MatrixRequest::new_basic(Method::GET, format!("/profile/{}/displayname", user_id))
             .send(rq)

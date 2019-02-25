@@ -2,8 +2,7 @@
 
 use crate::errors::*;
 use types::replies::*;
-use hyper::{Body, StatusCode};
-use hyper::client::Response;
+use hyper::{Body, StatusCode, Response};
 use serde::de::DeserializeOwned;
 use futures::*;
 use std::marker::PhantomData;
@@ -15,9 +14,9 @@ pub struct ResponseWrapper<T> {
     _ph: PhantomData<T>,
 }
 impl<T: DeserializeOwned> ResponseWrapper<T> {
-    pub fn wrap(r: Response) -> Self {
+    pub fn wrap(r: Response<Body>) -> Self {
         let sc = r.status();
-        let inner = r.body().concat2();
+        let inner = r.into_body().concat2();
         let _ph = PhantomData;
         Self { sc, inner, _ph, }
     }

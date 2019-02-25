@@ -12,14 +12,14 @@
 #![warn(missing_docs)]
 
 extern crate serde;
-#[macro_use] extern crate serde_json;
+extern crate serde_json;
 pub extern crate http;
 extern crate hyper;
 extern crate hyper_openssl;
 extern crate failure;
-#[macro_use] extern crate failure_derive;
+extern crate failure_derive;
 extern crate tokio_core;
-#[macro_use] extern crate futures;
+extern crate futures;
 extern crate percent_encoding;
 extern crate uuid;
 pub extern crate gm_types as types;
@@ -47,6 +47,7 @@ use std::borrow::Cow;
 use uuid::Uuid;
 use std::cell::RefCell;
 use std::rc::Rc;
+use serde_json::json;
 
 #[allow(missing_docs)]
 pub type MatrixHyper = Client<HttpsConnector<HttpConnector>>;
@@ -62,18 +63,29 @@ pub struct MatrixClient {
 }
 impl MatrixClient {
     pub fn new_from_access_token(token: &str, url: &str, hdl: &Handle) -> impl Future<Item = Self, Error = MatrixError> {
-        let conn = match HttpsConnector::new(4, hdl) {
+        let conn = match HttpsConnector::new(4) {
             Ok(c) => c,
             Err(e) => return Either::B(futures::future::err(e.into()))
         };
-        let client = hyper::Client::configure()
-            .connector(conn)
-            .build(hdl);
+        let client = Client::builder()
+            .build(conn);
+
         let uri: hyper::Uri = match format!("{}/_matrix/client/r0/account/whoami?access_token={}", url, token).parse() {
             Ok(u) => u,
             Err(e) => return Either::B(futures::future::err(e.into()))
         };
-        let mut req = hyper::Request::new(hyper::Method::Get, uri);
+
+        // Build the request
+        let req = Request::builder()
+            .method(Method::GET)
+            .uri(uri)
+            .body(hyper::Body::empty());
+        let req = match req {
+            Ok(r) => r,
+            Err(e) => return Either::B(futures::future::err(e.into()))
+        };
+
+        // Send request
         let resp = client.request(req).map_err(|e| e.into()).and_then(ResponseWrapper::<WhoamiReply>::wrap);
         let hdl = hdl.clone();
         let url = url.to_string();
@@ -90,7 +102,7 @@ impl MatrixClient {
         }))
     }
     /// Log in to a Matrix homeserver with a username and password, and return a client object.
-    /// 
+    ///
     /// ## Parameters
     ///
     /// - `username`: the username of the account to use (NB: not a MXID)
@@ -98,23 +110,32 @@ impl MatrixClient {
     /// - `url`: the URL of the homeserver
     /// - `hdl`: Tokio reactor handle
     pub fn login_password(username: &str, password: &str, url: &str, hdl: &Handle) -> impl Future<Item = Self, Error = MatrixError> {
-        let conn = match HttpsConnector::new(4, hdl) {
+        let conn = match HttpsConnector::new(4) {
             Ok(c) => c,
             Err(e) => return Either::B(futures::future::err(e.into()))
         };
-        let client = hyper::Client::configure()
-            .connector(conn)
-            .build(hdl);
+        let client = Client::builder()
+            .build(conn);
         let uri: hyper::Uri = match format!("{}/_matrix/client/r0/login", url).parse() {
             Ok(u) => u,
             Err(e) => return Either::B(futures::future::err(e.into()))
         };
-        let mut req = hyper::Request::new(hyper::Method::Post, uri);
-        req.set_body(json!({
-            "type": "m.login.password",
-            "user": username,
-            "password": password
-        }).to_string());
+
+        // Build the request
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri(uri)
+            .body(json!({
+                "type": "m.login.password",
+                "user": username,
+                "password": password
+            }).to_string().into());
+        let req = match req {
+            Ok(r) => r,
+            Err(e) => return Either::B(futures::future::err(e.into()))
+        };
+
+        // Send request
         let resp = client.request(req).map_err(|e| e.into()).and_then(ResponseWrapper::<LoginReply>::wrap);
         let hdl = hdl.clone();
         let url = url.to_string();
@@ -146,7 +167,7 @@ impl MatrixClient {
         Either::A(self.typed_api_call(req, true))
     }
     /// (for Application Services) Make a new AS client.
-    /// 
+    ///
     /// ## Parameters
     ///
     /// - `url`: homeserver URL
@@ -154,10 +175,9 @@ impl MatrixClient {
     /// - `as_token`: application service token
     /// - `hdl`: Tokio reactor handle
     pub fn as_new(url: String, user_id: String, as_token: String, hdl: &Handle) -> MatrixResult<Self> {
-        let conn = HttpsConnector::new(4, hdl)?;
-        let client = hyper::Client::configure()
-            .connector(conn)
-            .build(hdl);
+        let conn = HttpsConnector::new(4)?;
+        let client = hyper::Client::builder()
+            .build(conn);
         let hdl = hdl.clone();
         Ok(MatrixClient {
             hyper: client,
@@ -201,14 +221,12 @@ impl MatrixRequestable for Rc<RefCell<MatrixClient>> {
         self.borrow().is_as
     }
     fn send_request(&mut self, req: http::Request<Vec<u8>>) -> Self::SendRequestFuture {
-        use hyper::server::Service;
-
         let (parts, body) = req.into_parts();
         let body = hyper::Body::from(body);
         let req = Request::from_parts(parts, body);
 
         MxClientSendRequestFuture {
-            inner: self.borrow_mut().hyper.call(req.into())
+            inner: self.borrow_mut().hyper.request(req.into())
         }
     }
 }
@@ -227,7 +245,7 @@ impl Future for MxClientResponseBodyFuture {
 }
 /// The `SendRequestFuture` of a `MatrixClient`.
 pub struct MxClientSendRequestFuture {
-    inner: hyper::client::FutureResponse 
+    inner: hyper::client::ResponseFuture
 }
 impl Future for MxClientSendRequestFuture {
     type Item = Response<MxClientResponseBodyFuture>;
@@ -265,14 +283,12 @@ impl MatrixRequestable for MatrixClient {
         self.is_as
     }
     fn send_request(&mut self, req: http::Request<Vec<u8>>) -> Self::SendRequestFuture {
-        use hyper::server::Service;
-
         let (parts, body) = req.into_parts();
         let body = hyper::Body::from(body);
         let req = Request::from_parts(parts, body);
 
         MxClientSendRequestFuture {
-            inner: self.hyper.call(req.into())
+            inner: self.hyper.request(req.into())
         }
     }
 }

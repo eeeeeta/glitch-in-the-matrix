@@ -10,7 +10,7 @@ use crate::errors::{MatrixError, MatrixResult};
 use types::replies::BadRequestReply;
 use serde_json;
 use percent_encoding::{utf8_percent_encode, DEFAULT_ENCODE_SET};
-use futures::{self, Future, Poll, Async};
+use futures::{self, Future, Poll, Async, try_ready};
 use std::marker::PhantomData;
 
 /// Describes the type of a Matrix API.
@@ -203,7 +203,7 @@ impl<'a, 'b, 'c> MatrixRequest<'a, HashMap<Cow<'b, str>, Cow<'c, str>>> {
     /// - `meth` and `endpoint` specified
     /// - `body` converted from an iterator over `(T, U)` where T & U implement `Into<Cow<str>>`
     /// - `params` set to an empty hashmap
-    /// - `typ` set to `apis::r0::ClientApi` 
+    /// - `typ` set to `apis::r0::ClientApi`
     pub fn new_with_body<S, T, U, V>(meth: Method, endpoint: S, body: V) -> Self
         where S: Into<Cow<'a, str>>,
               T: Into<Cow<'b, str>>,
@@ -221,7 +221,7 @@ impl<'a, 'b, 'c> MatrixRequest<'a, HashMap<Cow<'b, str>, Cow<'c, str>>> {
     }
 }
 impl<'a, T> MatrixRequest<'a, T> where T: Serialize {
-    /// Like `new_with_body`, but takes a serializable object for `body`. 
+    /// Like `new_with_body`, but takes a serializable object for `body`.
     pub fn new_with_body_ser<S>(meth: Method, endpoint: S, body: T) -> Self
         where S: Into<Cow<'a, str>> {
         Self {
