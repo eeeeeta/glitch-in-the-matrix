@@ -5,6 +5,7 @@ use crate::request::{MatrixRequest, MatrixRequestable};
 use http::Method;
 use crate::errors::MatrixError;
 use futures::Future;
+use serde_json::json;
 
 /// Contains methods relating to `/presence/` endpoints.
 pub struct PresenceManagement;

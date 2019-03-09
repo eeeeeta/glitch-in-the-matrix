@@ -10,6 +10,8 @@ macro_rules! derive_from {
          )*
     }
 }
+use failure::Fail;
+
 /// Something Matrixy that can go wrong.
 #[derive(Fail, Debug)]
 #[allow(missing_docs)]
@@ -19,7 +21,7 @@ pub enum MatrixError {
     #[fail(display = "Serialization error: {}", _0)]
     Serde(#[cause] ::serde_json::Error),
     #[fail(display = "Error decoding URI: {}", _0)]
-    UriError(#[cause] ::hyper::error::UriError),
+    UriError(#[cause] ::hyper::http::uri::InvalidUri),
     #[fail(display = "I/O error: {}", _0)]
     Io(#[cause] ::std::io::Error),
     #[fail(display = "OpenSSL error: {}", _0)]
@@ -41,7 +43,7 @@ pub enum MatrixError {
 derive_from!(MatrixError,
              Hyper, ::hyper::error::Error,
              Serde, ::serde_json::Error,
-             UriError, ::hyper::error::UriError,
+             UriError, ::hyper::http::uri::InvalidUri,
              HttpError, ::http::Error,
              InvalidHeaderValue, ::http::header::InvalidHeaderValue,
              Io, ::std::io::Error,
