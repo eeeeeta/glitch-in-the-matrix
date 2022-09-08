@@ -1,3 +1,7 @@
+# WARNING: Unmaintained
+
+This hasn't been maintained in 3 years! You probably want the [official matrix.org Rust SDK](https://github.com/matrix-org/matrix-rust-sdk).
+
 Glitch in the Matrix
 ====================
 
